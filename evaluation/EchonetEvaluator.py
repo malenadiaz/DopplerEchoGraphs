@@ -15,7 +15,7 @@ import pickle
 from datasets import datas
 from .BaseEvaluator import DatasetEvaluator
 from utils.utils_plot import plot_grid, draw_kpts, plot_kpts_pred_and_gt
-from utils.utils_stat import match_two_kpts_set
+from utils.utils_stat import match_two_kpts_set, compare_two_kpts_phys
 
 class EchonetEvaluator(DatasetEvaluator):
     """
@@ -216,11 +216,19 @@ class EchonetEvaluator(DatasetEvaluator):
         num_kpts = self._dataset.num_kpts
         num_annotated_frames = 2 if "ef" in self._tasks else 1
         for prediction in predictions.values():
+            datapoint_index = self._dataset.img_list.index(prediction["data_path_from_root"])
+            metadata,cycle = self._dataset.get_metadata(datapoint_index)
+            gt_kpts = prediction["keypoints"]  * self._dataset.input_size
+            pred_kpts = prediction["keypoints_prediction"] * self._dataset.input_size
+            compare_two_kpts_phys(gt_kpts,pred_kpts, metadata, cycle )
             dist_pred_gt_kpts.append(100 * match_two_kpts_set(prediction["keypoints"].reshape(num_kpts * num_annotated_frames, 2),
                                                               prediction["keypoints_prediction"].reshape(num_kpts * num_annotated_frames, 2)))
+        indKptsERR = np.mean(dist_pred_gt_kpts, axis=0)
+        indKptsERR = ["kpt {}:{}".format(index, item.round(3)) for (index,item) in enumerate(indKptsERR)]
         mKptsERR = np.mean(np.stack(dist_pred_gt_kpts))
         if self._verbose:
             self._logger.info("Mean keypoints error is {}".format(mKptsERR))
+            self._logger.info("Mean keypoints error for each kpt is {}".format(indKptsERR))
 
         return mKptsERR
 

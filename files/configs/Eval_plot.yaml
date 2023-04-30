@@ -1,3 +1,4 @@
 EVAL:
-  EXAMPLES_TO_PLOT: 10
-  WEIGHTS: 'C:/dev/experiments/echonet/logs/echonet40/CNNGCNV3/mobilenet2/831115114/weights_echonet40_CNNGCNV3_best_kptsErr.pth'
+  WEIGHTS: './echonet/storage/logs/malena/CNNGCNV3/mobilenet2/302133045/weights_malena_CNNGCNV3_best_kptsErr.pth'
+  INPUT_SIZE: 300
+  EXAMPLES_TO_PLOT: 5

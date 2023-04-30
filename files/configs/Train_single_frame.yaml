@@ -1,11 +1,12 @@
 TRAIN:
-  BATCH_SIZE: 128
-  EPOCHS: 10000
-  DATASET: 'echonet40'
-  INPUT_SIZE: 112
+  BATCH_SIZE: 7
+  EPOCHS: 3
+  DATASET: 'malena'
+  INPUT_SIZE: 300
+  NUM_KPTS : 13
 MODEL:
   NAME: 'CNNGCNV3'
-  BACKBONE: 'mobilenet2'
+  BACKBONE: 'RadImageNet_resnet50'
   LOSS_FUNC: ['L2']
 AUG:
   METHOD: 'strongkeep'

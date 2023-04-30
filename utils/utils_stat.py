@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import math
 import scipy.interpolate as interpolate
 import numpy as np
+from utils.kpts_utils import transform_list
 
 ########################################
 ########################################
@@ -49,6 +50,12 @@ def find_kpt_consistencies_Andy(test_movie_pred_kpts):
 # Eval utils
 ############################
 ############################
+def compare_two_kpts_phys(kpts1, kpts2, cycle_metadata, cycle):
+    kpts_x = transform_list(kpts1[:,0])
+    kpts_y = transform_list(kpts1[:,1])
+    pred_y = transform_list(kpts2[:,0])
+    pred_y = transform_list(kpts2[:,1])
+
 def match_two_kpts_set(kpts1, kpts2):
     """
     :param kpts1: normalized keypoints set1

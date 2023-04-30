@@ -6,6 +6,7 @@ import math
 import scipy.interpolate as interpolate
 from PIL import Image, ImageDraw
 from typing import List
+from utils.rkt_spline_module import generateSpline
 
 ############################
 ############################
@@ -56,8 +57,12 @@ def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=[], 
         if closed_contour:
             gt_kpts = np.concatenate((gt_kpts, gt_kpts[:1, :]), axis=0)
         if len(kpts_info['names']) > 3:
-            gt_tck, _ = interpolate.splprep([gt_kpts[:, 0], gt_kpts[:, 1]], s=0)
-            gt_interpolate = interpolate.splev(unew, gt_tck)
+            try:
+                gt_interpolate = generateSpline(gt_kpts[:, 0].astype("int"), gt_kpts[:, 1].astype("int"))
+            except Exception as e:
+                print(e)
+                gt_tck, _ = interpolate.splprep([gt_kpts[:, 0], gt_kpts[:, 1]], s=0)
+                gt_interpolate = interpolate.splev(unew, gt_tck)
 
     if pred_kpts is not None:
         img = draw_kpts(img=img, kpts=pred_kpts,
@@ -67,8 +72,12 @@ def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=[], 
         if closed_contour:
             pred_kpts = np.concatenate((pred_kpts, pred_kpts[:1,:]), axis=0)
         if len(kpts_info['names']) > 3:
-            pred_tck, _ = interpolate.splprep([pred_kpts[:, 0], pred_kpts[:, 1]], s=0)
-            pred_interpolate = interpolate.splev(unew, pred_tck)
+            try:
+                pred_interpolate = generateSpline(pred_kpts[:, 0].astype("int"), pred_kpts[:, 1].astype("int"))
+            except Exception as e:
+                print(e)
+                pred_tck, _ = interpolate.splprep([pred_kpts[:, 0], pred_kpts[:, 1]], s=0)
+                pred_interpolate = interpolate.splev(unew, pred_tck)
 
     # option 1: clean img + kpts_img
     ax = fig.add_subplot(1, 3, 1)

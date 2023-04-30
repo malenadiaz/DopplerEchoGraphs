@@ -123,7 +123,7 @@ _C.EVAL.EXAMPLES_TO_PLOT = 10
 # mode to execute the evaluation ['normal', 'sliding window']
 _C.EVAL.MODE ='normal'
 # dataset to be used for evaluation in normal(!) mode [echonet40, echonet_cycle]
-_C.EVAL.DATASET = "echonet40"
+_C.EVAL.DATASET = "malena"
 
 # ---------------------------------------------------------------------------- #
 # Inference options
@@ -146,7 +146,7 @@ _C.INF.OUTPUT = ''
 _C.SEED = 1234
 
 # Number of frames (1 for single, >1 for multiple) [1,16]
-_C.NUM_FRAMES = 2
+_C.NUM_FRAMES = 1 #MD cambiado
 
 _C.KPTS_EXTRACTOR_WEIGHTS = None
 
@@ -204,6 +204,7 @@ def cfg_costum_setup(args):
         cfg.merge_from_file(args.config_file)
     else:
         print("No yaml file loaded. Use default cfg file configuration.")
+
     if hasattr(args, 'opts'):
         if len(args.opts) > 0:
             cfg.merge_from_list(args.opts)

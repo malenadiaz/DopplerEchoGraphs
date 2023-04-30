@@ -7,7 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 import socket
 
 ### Import internal libraries
-import CONST
+import CONST as CONST
 from engine.loops import sample_dataset, train_vanilla, validate
 from engine.checkpoints import save_model
 from evaluation.EchonetEvaluator import EchonetEvaluator

@@ -15,6 +15,7 @@ class image_encoder(nn.Module):
         # cnn encoder: use resnet features from the last hidden layer:
         ################
         hub_name = 'pytorch/vision:v0.10.0'#'pytorch/vision:v0.10.0'#'pytorch/vision:v0.6.0'
+        local_name = './RadImageNet_models/'
         if backbone == 'alexnet':
             self.base_net = torch.hub.load(hub_name, 'alexnet', pretrained=True)
             self.base_net.classifier = nn.Sequential(*list(self.base_net.classifier.children())[:-1])
@@ -31,6 +32,11 @@ class image_encoder(nn.Module):
             self.base_net =torch.hub.load(hub_name, 'resnet50', pretrained=True)
             self.base_net = nn.Sequential(*list(self.base_net.children())[:-1])
             self.img_feature_size = 2048
+        elif backbone == 'RadImageNet_resnet50' or backbone == 500:
+            self.base_net =torch.hub.load(hub_name, 'resnet50')
+            self.base_net.load_state_dict(torch.load("./radImageNet/RadImageNet-ResNet50_notop_torch.pth"))
+            self.base_net = nn.Sequential(*list(self.base_net.children())[:-1])
+            self.img_feature_size = 2048
         elif backbone == 'densenet161' or backbone == 161:
             self.base_net = torch.hub.load(hub_name, 'densenet161', pretrained=True)
             self.base_net = nn.Sequential(*list(self.base_net.children())[:-1],
@@ -39,7 +45,7 @@ class image_encoder(nn.Module):
                                           nn.Flatten())
             self.img_feature_size = 2208
         elif backbone == 'densenet201' or backbone == 201:
-            self.base_net = torch.hub.load(hub_name, 'densenet201', pretrained=True)
+            self.base_net = torchload(hub_name, 'densenet201', pretrained=True)
             self.base_net = nn.Sequential(*list(self.base_net.children())[:-1],
                                           nn.ReLU(inplace=True),
                                           nn.AdaptiveAvgPool2d((1, 1)),

@@ -10,7 +10,7 @@ from fvcore.common.config import CfgNode
 # Load/Save models
 ########################################
 ########################################
-def load_trained_model(weights_filename: str = None, load_dataset_from_checkpoint: bool = True) -> Tuple[torch.nn.Module, CfgNode, datas]:
+def load_trained_model(weights_filename: str = None, is_gpu:bool = True, load_dataset_from_checkpoint: bool = True) -> Tuple[torch.nn.Module, CfgNode, datas]:
     model = None
     cfg = None
     ds = None
@@ -23,7 +23,7 @@ def load_trained_model(weights_filename: str = None, load_dataset_from_checkpoin
             cfg = checkpoint['cfg']
             if load_dataset_from_checkpoint == True:
                 ds = load_dataset(cfg.TRAIN.DATASET, input_transform=None, input_size=cfg.TRAIN.INPUT_SIZE, num_frames=cfg.NUM_FRAMES)
-            model = load_model(cfg)
+            model = load_model(cfg, is_gpu)
             model.load_state_dict(checkpoint['model_state_dict'])
             if 'current_train_loss' in checkpoint:
                 print('current_train_loss = %.6f' % checkpoint['current_train_loss'])

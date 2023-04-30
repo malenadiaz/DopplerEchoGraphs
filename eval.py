@@ -56,11 +56,10 @@ def eval_trained_model(model: torch.nn.Module, cfg: CfgNode, ds: datas,
     # frames_info_file = pd.read_csv(ds.testset.echonet_frame_info_csvfile, index_col=0)
     # frames_info_file = frames_info_file[frames_info_file.Split == "TEST"]
 
-    evaluator = EchonetEvaluator(dataset=ds.testset, tasks=["ef"], output_dir=out_directory)
+    evaluator = EchonetEvaluator(dataset=ds.testset, tasks=["kpts"], output_dir=out_directory)
     evaluator.process(test_inputs, test_outputs)
     evaluator.evaluate()
     evaluator.plot(num_examples_to_plot=min(num_examples_to_plot, len(test_outputs)))
-
     print(" ** test loss: {}".format(test_loss))
     # compute_stats(total_filenames, total_output_guiding, total_gt_guiding, textfilename=textfilename)
 
@@ -150,7 +149,8 @@ if __name__ == '__main__':
     cfg_eval = cfg_costum_setup(args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model, cfg_model, _ = load_trained_model(weights_filename=cfg_eval.EVAL.WEIGHTS)
+    is_gpu = True if device == "cuda" else False
+    model, cfg_model, _ = load_trained_model(weights_filename=cfg_eval.EVAL.WEIGHTS, is_gpu=False)
     cfg = overwrite_eval_cfg(cfg_model,cfg_eval)
 
     model = model.to(device)

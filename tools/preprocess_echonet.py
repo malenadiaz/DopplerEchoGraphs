@@ -8,7 +8,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.utils_contour import echonet_trace_to_mask
-import CONST
+import EchoGraphs.CONST as CONST
 
 """ Looping over the entire echonet dataset to create following files:
 - array of the frame (width*height)

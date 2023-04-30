@@ -1,11 +1,12 @@
 import os
 import albumentations as A
-import CONST
+import CONST as CONST
 from typing import Dict
 
 from data.USKpts import USKpts
 from data.USKptsNPZ import USKptsNPZ
 from data.USKpts_EchoNet import USKpts_EchoNet
+from data.USKpts_Malena import USKpts_MAL
 from transforms import load_transform
 from utils.utils_files import copy_train_data
 
@@ -64,7 +65,6 @@ def load_dataset(ds_name: str, input_transform: A.core.composition.Compose = Non
     # Copy data to host, if needed
     if hasattr(CONST, 'US_MultiviewData_MASTER'):
         copy_train_data(master_root_path=CONST.US_MultiviewData_MASTER, host_root_path=us_data_folder, folder_path_from_root="preprocessed/40/")
-
 
     if ds_name == 'apical':     # 427 + 107 = 534 examples
         img_dirname = os.path.join(us_data_folder,  "apical/frames/")  #"/shared-data5/MultiView/apical/movies/"  #"/shared-data5/MultiView/apical/frames/"
@@ -130,17 +130,26 @@ def load_dataset(ds_name: str, input_transform: A.core.composition.Compose = Non
         loader_func = USKpts_EchoNet
         img_dirname = os.path.join(us_data_folder, "preprocessed/40/cycle/frames/")
         anno_dirname = os.path.join(us_data_folder, "preprocessed/40/cycle/annotations/")
-        train_filenames_list = 'files/filenames/echonet_cycle_test_filenames.txt'
-        val_filenames_list = 'files/filenames/echonet_cycle_test_filenames.txt'
+        train_filenames_list = 'files/filenames/echonet_cycle_train_filenames.txt'
+        val_filenames_list = 'files/filenames/echonet_cycle_val_filenames.txt'
         test_filenames_list = 'files/filenames/echonet_cycle_test_filenames.txt'
         frame_selection_mode = 'all'#'edToEs'
         nb_classes, closed_contour = 40, False
 
+    elif ds_name == 'malena':
+        loader_func = USKpts_MAL
+        img_dirname = os.path.join(us_data_folder, "frames/")
+        anno_dirname = os.path.join(us_data_folder, "annotations/")
+        train_filenames_list = os.path.join(us_data_folder, 'filenames/malena_train_filenames.txt')
+        val_filenames_list = os.path.join(us_data_folder, 'filenames/malena_val_filenames.txt')
+        test_filenames_list = os.path.join(us_data_folder, 'filenames/malena_test_filenames.txt')
+        frame_selection_mode = None
+        nb_classes, closed_contour = 13, False
 
     else:
         raise NotImplementedError("Can't use dataset {}.".format(ds_name))
 
-    dataset_config = {"img_folder": img_dirname, "anno_folder": anno_dirname, "transform": input_transform, "input_size": input_size,
+    dataset_config = {"img_folder": img_dirname, "anno_folder": anno_dirname, "transform": input_transform, "input_size": input_size, 
                       "num_kpts": nb_classes, "closed_contour": closed_contour, "num_frames": num_frames, "frame_selection_mode": frame_selection_mode}
 
     ds = datas(loader_func=loader_func, dataset_config=dataset_config, input_transform=input_transform,
