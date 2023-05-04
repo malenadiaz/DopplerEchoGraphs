@@ -16,8 +16,8 @@ from datasets import datas
 from .BaseEvaluator import DatasetEvaluator
 from dopplerProcessing.visualization import  plot_kpts_pred_and_gt
 
-from dopplerProcessing.kpts_utils import to_physical_list
-from dopplerProcessing.stat_utils import stats_report_doppler, compute_kpts_err, stats_report_point_doppler, create_bland_altman
+from dopplerProcessing.kpts_utils import to_physical_list, detransform_list
+from dopplerProcessing.stat_utils import stats_report_doppler, compute_kpts_err, stats_report_point_doppler, create_bland_altman, create_point_annotations_excel, compute_stats_original_points
 
 class DopplerEvaluator(DatasetEvaluator):
     """
@@ -163,12 +163,18 @@ class DopplerEvaluator(DatasetEvaluator):
             gt_kpts = prediction["keypoints"]  * self._dataset.input_size
             pred_kpts = prediction["keypoints_prediction"] * self._dataset.input_size
 
+            #original pixeles from the image 
+            gt_kpts = detransform_list(gt_kpts, metadata[cycle])
+            pred_kpts = detransform_list(pred_kpts, metadata[cycle])
+
             #convert to physical keypoints
             if report:
-                phys_gt_kpts = to_physical_list(gt_kpts, metadata, cycle)
-                phys_pred_kpts = to_physical_list(pred_kpts, metadata, cycle)
+                phys_gt_kpts = to_physical_list(gt_kpts, metadata['gen'])
+                phys_pred_kpts = to_physical_list(pred_kpts, metadata['gen'])
+                
                 all_phys_gt_kpts.append(phys_gt_kpts)
                 all_phys_pred_kpts.append(phys_pred_kpts)
+
                 img_paths.append(prediction["data_path_from_root"])
 
             all_gt_kpts.append(gt_kpts)
@@ -178,32 +184,29 @@ class DopplerEvaluator(DatasetEvaluator):
         all_pred_kpts = np.array(all_pred_kpts)
 
         if report:
-            all_phys_gt_kpts = np.array(all_phys_gt_kpts)
-            all_phys_pred_kpts = np.array(all_phys_pred_kpts)
-            labels = self._dataset.get_labels(datapoint_index)
-
-            df = stats_report_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels)
-            df2 = stats_report_point_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels,img_paths)
-            
-            create_bland_altman(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
-            
+                        
             if not os.path.exists(self._output_dir):
                 os.makedirs(self._output_dir)
+            
+            all_phys_gt_kpts = np.array(all_phys_gt_kpts)
+            all_phys_pred_kpts = np.array(all_phys_pred_kpts)
+            labels = self._dataset.get_labels().tolist()
+
+            df = stats_report_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels)
+            
+            #df2 = compute_stats_original_points(all_pred_kpts, all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, labels)
+            #df2 = stats_report_point_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels,img_paths)
+            #create_point_annotations_excel(all_pred_kpts, all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, labels, img_paths, self._output_dir)
+            
+            create_bland_altman(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
 
             file_path = os.path.join(self._output_dir, "stats_report.csv")
             df.to_csv(file_path, sep=";", decimal=",")
 
-            file_path = os.path.join(self._output_dir, "stats_point_report.csv")
-            df2.to_csv(file_path, sep=";", decimal=",")
+            # file_path = os.path.join(self._output_dir, "stats_og_report.csv")
+            # df2.to_csv(file_path, sep=";", decimal=",")
 
             mKptsERR = df.loc["PIX MSE"]["TOTAL"]
-
-            if self._output_dir is not None:
-                if not os.path.exists(self._output_dir):
-                    os.makedirs(self._output_dir)
-                file_path = os.path.join(self._output_dir, "echonet_predictions_2.pkl")
-                with open(file_path, 'wb') as handle:
-                    pickle.dump(predictions, handle, protocol=pickle.HIGHEST_PROTOCOL)
             
         else:
             mKptsERR = compute_kpts_err(all_pred_kpts, all_gt_kpts)

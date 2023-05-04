@@ -52,14 +52,14 @@ def get_metric(pred_kpts, gt_kpts, metric):
     res = []
     res.append(metric(gt_kpts.flatten(), pred_kpts.flatten()))
     for i in range(len(pred_kpts[0])):
-        res.append(metric(pred_kpts[:,i], gt_kpts[:,i]))
+        res.append(metric( gt_kpts[:,i], pred_kpts[:,i]))
     return res
 
 def compute_mse(pred_kpts, gt_kpts):
     return mean_squared_error(gt_kpts, pred_kpts)
 
 def compute_kpts_err(pred_kpts, gt_kpts):
-    return mean_squared_error(pred_kpts.flatten(), gt_kpts.flatten())
+    return mean_squared_error(gt_kpts.flatten(), pred_kpts.flatten(),)
 
 
 def load_pickle(path):
@@ -95,10 +95,51 @@ def stats_report_point_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts,
     df["EJE TIME MAPE"] = get_ejection_time_point(pred_kpts, gt_kpts, labels, mean_absolute_percentage_error)
     df["EJE TIME MSE"] = get_ejection_time_point(pred_kpts, gt_kpts, labels, mean_squared_error)
 
+
     return df
 
+
+def create_point_annotations_excel(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, labels, dict_keys, output_dir):
+    columns= []
+    for lbl in labels:
+        columns.append(lbl + '_REAL_X')
+        columns.append(lbl + '_PREDICTED_X')
+        columns.append(lbl + '_REAL_Y')
+        columns.append(lbl + '_PREDICTED_Y')
+
+    df_1 = pd.DataFrame(columns = columns , index = dict_keys)
+    df_2 = pd.DataFrame(columns = columns , index = dict_keys)
+    df_3 = pd.DataFrame(columns = columns , index = dict_keys)
+    df_4 = pd.DataFrame(columns = columns , index = dict_keys)
+
+    for i in range(len(labels)):
+        df_1[labels[i] + '_REAL_X'] = gt_kpts[:,i, 0]
+        df_1[labels[i] + '_PREDICTED_X'] = pred_kpts[:,i, 0]
+        df_3[labels[i] + '_ERROR_X'] = np.abs(gt_kpts[:,i, 0] - pred_kpts[:,i, 0])
+        df_1[labels[i] + '_REAL_Y'] = gt_kpts[:,i, 1]
+        df_1[labels[i] + '_PREDICTED_Y'] = pred_kpts[:,i, 1]
+        df_3[labels[i] + '_ERROR_Y'] = np.abs(gt_kpts[:,i, 1] - pred_kpts[:,i, 1])
+        df_2[labels[i] + '_REAL_X'] = phys_gt_kpts[:,i, 0]
+        df_2[labels[i] + '_PREDICTED_X'] = phys_pred_kpts[:,i, 0]
+        df_4[labels[i] + '_ERROR_X'] = np.abs(phys_gt_kpts[:,i, 0] - phys_pred_kpts[:,i, 0])
+        df_2[labels[i] + '_REAL_Y'] = phys_gt_kpts[:,i, 1]
+        df_2[labels[i] + '_PREDICTED_Y'] = phys_pred_kpts[:,i, 1]
+        df_4[labels[i] + '_ERROR_Y'] = np.abs(phys_gt_kpts[:,i, 1] - phys_pred_kpts[:,i, 1])
+
+    with pd.ExcelWriter(os.path.join(output_dir, "real_vs_pred.xlsx")) as writer:  
+
+        df_1.to_excel(writer, sheet_name='Pixel')
+        df_2.to_excel(writer, sheet_name='Physical')
+        df_3.to_excel(writer, sheet_name='Pixel_error')
+        df_4.to_excel(writer, sheet_name='Physical_error')
+
+def compute_stats_original_points(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, labels):
+    og_idxs = [index for index, value in enumerate(labels) if value != 'spline_point']
+    og_lbls = [value for value in labels if value != 'spline_point']
+
+    return stats_report_doppler(pred_kpts[:,og_idxs,:], gt_kpts[:,og_idxs,:], phys_pred_kpts[:,og_idxs,:], phys_gt_kpts[:,og_idxs,:], og_lbls)
+
 def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, labels):
-    labels = labels.tolist()
     pf = pd.DataFrame(columns= ['TOTAL'] + labels ,
                        index=["PIX MAPE", "PIX MAPE X", "PIX MAPE Y" 
                             ,"PIX MSE", "PIX MSE X", "PIX MSE Y" 
@@ -107,77 +148,80 @@ def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, label
                             ,"PUL IDX MAPE", "PUL IDX MSE"
                             ,"EJE TIME MAPE", "EJE TIME MSE"])
     
-    pf.loc["PIX MAPE"] = get_metric(gt_kpts, pred_kpts, mean_absolute_percentage_error)
-    pf.loc["PIX MAPE X"] = get_metric(gt_kpts, pred_kpts, mean_absolute_percentage_error)
-    pf.loc["PIX MAPE Y"] = get_metric(gt_kpts, pred_kpts, mean_absolute_percentage_error)
+    pf.loc["PIX MAPE"] = get_metric(pred_kpts, gt_kpts, mean_absolute_percentage_error)
+    pf.loc["PIX MAPE X"] = get_metric(pred_kpts,gt_kpts,  mean_absolute_percentage_error)
+    pf.loc["PIX MAPE Y"] = get_metric(pred_kpts,gt_kpts,  mean_absolute_percentage_error)
 
-    pf.loc["PIX MSE"] = get_metric(gt_kpts, pred_kpts, mean_squared_error)
-    pf.loc["PIX MSE X"] = get_metric(gt_kpts[:,:,0], pred_kpts[:,:,0], mean_squared_error)
-    pf.loc["PIX MSE Y"] = get_metric(gt_kpts[:,:,1], pred_kpts[:,:,1], mean_squared_error)
+    pf.loc["PIX MSE"] = get_metric( pred_kpts, gt_kpts, mean_squared_error)
+    pf.loc["PIX MSE X"] = get_metric( pred_kpts[:,:,0], gt_kpts[:,:,0], mean_squared_error)
+    pf.loc["PIX MSE Y"] = get_metric( pred_kpts[:,:,1], gt_kpts[:,:,1], mean_squared_error)
 
-    pf.loc["PHYS MAPE"] = get_metric(phys_gt_kpts, phys_pred_kpts, mean_absolute_percentage_error)
-    pf.loc["PHYS MAPE X"] = get_metric(phys_gt_kpts[:,:,0], phys_pred_kpts[:,:,0], mean_absolute_percentage_error)
-    pf.loc["PHYS MAPE Y"] = get_metric(phys_gt_kpts[:,:,1], phys_pred_kpts[:,:,1], mean_absolute_percentage_error)
+    pf.loc["PHYS MAPE"] = get_metric(phys_pred_kpts, phys_gt_kpts, mean_absolute_percentage_error)
+    pf.loc["PHYS MAPE X"] = get_metric( phys_pred_kpts[:,:,0],phys_gt_kpts[:,:,0], mean_absolute_percentage_error)
+    pf.loc["PHYS MAPE Y"] = get_metric( phys_pred_kpts[:,:,1],phys_gt_kpts[:,:,1], mean_absolute_percentage_error)
 
-    pf.loc["PHYS MSE"] = get_metric(phys_gt_kpts, phys_pred_kpts, mean_squared_error)
-    pf.loc["PHYS MSE X"] = get_metric(phys_gt_kpts[:,:,0], phys_pred_kpts[:,:,0], mean_squared_error)
-    pf.loc["PHYS MSE Y"] = get_metric(phys_gt_kpts[:,:,1], phys_pred_kpts[:,:,1], mean_squared_error)
+    pf.loc["PHYS MSE"] = get_metric(phys_pred_kpts, phys_gt_kpts, mean_squared_error)
+    pf.loc["PHYS MSE X"] = get_metric(phys_pred_kpts[:,:,0], phys_gt_kpts[:,:,0], mean_squared_error)
+    pf.loc["PHYS MSE Y"] = get_metric(phys_pred_kpts[:,:,1],phys_gt_kpts[:,:,1],  mean_squared_error)
 
     pf.loc[["PUL IDX MAPE"],["TOTAL"]] = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts, mean_absolute_percentage_error)
     pf.loc[["PUL IDX MSE"],["TOTAL"]] = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts, mean_squared_error)
    
     pf.loc[["EJE TIME MAPE"],["TOTAL"]] = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels, mean_absolute_percentage_error)
     pf.loc[["EJE TIME MSE"],["TOTAL"]] = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels, mean_squared_error)
+    
+    pf = pf.astype(float)
+
+    # idxs = np.argwhere(phys_gt_kpts == 0 )
+    # print(idxs)
 
     return pf
 
 def create_bland_altman(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels, output_dir):    
     
-    f, ax = plt.subplots(3,2, figsize = (12, 26))
-    sm.graphics.mean_diff_plot(all_gt_kpts.flatten(), all_pred_kpts.flatten(), ax = ax[0][0])
-    ax[0][0].set_title("All points pixel-wise")
-    sm.graphics.mean_diff_plot(all_phys_gt_kpts.flatten(), all_phys_pred_kpts.flatten(), ax = ax[0][1])
-    ax[0][1].set_title("All points physical")
-    sm.graphics.mean_diff_plot(all_gt_kpts[:,:,0].flatten(), all_pred_kpts[:,:,0].flatten(), ax = ax[1][0])
-    ax[1][0].set_title("X points pixel-wise")
-    sm.graphics.mean_diff_plot(all_gt_kpts[:,:,1].flatten(), all_pred_kpts[:,:,1].flatten(), ax = ax[1][1])
-    ax[1][1].set_title("Y points pixel-wise")
-    sm.graphics.mean_diff_plot(all_phys_gt_kpts.flatten(), all_phys_pred_kpts.flatten(), ax = ax[2][0])
-    ax[2][0].set_title("All points physical")
-    sm.graphics.mean_diff_plot(all_phys_gt_kpts.flatten(), all_phys_pred_kpts.flatten(), ax = ax[2][1])
-    ax[2][1].set_title("All points physical")
-    f.savefig(os.path.join(output_dir,'General_bland_altman.png'))
-    ##########
-    
-    f.clf()
-    num_kpts = len(all_pred_kpts[0])
-    f, ax = plt.subplots(nrows=num_kpts, ncols=3, figsize=( 3*6, num_kpts*8))
-
-    for i in range(num_kpts):
-        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,:].flatten(), all_pred_kpts[:,i,:].flatten(), ax = ax[i][0])
-        ax[i][0].set_title("kpt_{} physical x and y".format(i))
-        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,0].flatten(), all_pred_kpts[:,i,0].flatten(), ax = ax[i][1])
-        ax[i][1].set_title("kpt_{} physical x".format(i))
-        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,1].flatten(), all_pred_kpts[:,i,1].flatten(), ax = ax[i][2])
-        ax[i][2].set_title("kpt_{} physical y".format(i))
-
-    f.savefig(os.path.join(output_dir,'Point_pixel_bland_altman.png'))
-
-    
-    ##########
+    f, ax = plt.subplots(1,2, figsize = (25, 20))
+    sm.graphics.mean_diff_plot(all_gt_kpts.flatten(), all_pred_kpts.flatten(), ax = ax[0])
+    ax[0].set_title("All points pixel-wise")
+    sm.graphics.mean_diff_plot(all_phys_gt_kpts.flatten(), all_phys_pred_kpts.flatten(), ax = ax[1])
+    ax[1].set_title("All points physical")
+    f.savefig(os.path.join(output_dir,'ALL_points.png'))
 
     f.clf()
+    f, ax = plt.subplots(1,2, figsize = (25, 20))
+    sm.graphics.mean_diff_plot(all_gt_kpts[:,:,0].flatten(), all_pred_kpts[:,:,0].flatten(), ax = ax[0])
+    ax[0].set_title("X points pixel-wise")
+    sm.graphics.mean_diff_plot(all_gt_kpts[:,:,1].flatten(), all_pred_kpts[:,:,1].flatten(), ax = ax[1])
+    ax[1].set_title("Y points pixel-wise")
+    f.savefig(os.path.join(output_dir,'XY_points_pixel.png'))
+ 
+    f.clf()
+    f, ax = plt.subplots(1,2, figsize = (25, 20))
+    sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,:,0].flatten(), all_phys_pred_kpts[:,:,0].flatten(), ax = ax[0])
+    ax[0].set_title("X points physical")
+    sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,:,1].flatten(), all_phys_pred_kpts[:,:,1].flatten(), ax = ax[1])
+    ax[1].set_title("X points physical")
+    f.savefig(os.path.join(output_dir,'XY_points_physical.png'))
+
+    ##########
+    
     num_kpts = len(all_pred_kpts[0])
-    f, ax = plt.subplots(nrows=num_kpts, ncols=3, figsize=( 3*6, num_kpts*8))
 
     for i in range(num_kpts):
-        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,:].flatten(), all_phys_pred_kpts[:,i,:].flatten(), ax = ax[i][0])
-        ax[i][0].set_title("kpt_{} physical x and y".format(i))
-        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,0].flatten(), all_phys_pred_kpts[:,i,0].flatten(), ax = ax[i][1])
-        ax[i][1].set_title("kpt_{} physical x".format(i))
-        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,1].flatten(), all_phys_pred_kpts[:,i,1].flatten(), ax = ax[i][2])
-        ax[i][2].set_title("kpt_{} physical y".format(i))
+        f.clf()
+        f, ax = plt.subplots(nrows=2, ncols=3, figsize=(25,25))
 
-    f.savefig(os.path.join(output_dir,'Point_physical_bland_altman.png'))
+        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,:].flatten(), all_pred_kpts[:,i,:].flatten(), ax = ax[0][0])
+        ax[0][0].set_title("kpt_{} pixel x and y".format(i))
+        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,0].flatten(), all_pred_kpts[:,i,0].flatten(), ax = ax[0][1])
+        ax[0][1].set_title("kpt_{} pixel x".format(i))
+        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,1].flatten(), all_pred_kpts[:,i,1].flatten(), ax = ax[0][2])
+        ax[0][2].set_title("kpt_{} pixel y".format(i))
+        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,:].flatten(), all_phys_pred_kpts[:,i,:].flatten(), ax = ax[1][0])
+        ax[1][0].set_title("kpt_{} physical x and y".format(i))
+        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,0].flatten(), all_phys_pred_kpts[:,i,0].flatten(), ax = ax[1][1])
+        ax[1][1].set_title("kpt_{} physical x".format(i))
+        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,1].flatten(), all_phys_pred_kpts[:,i,1].flatten(), ax = ax[1][2])
+        ax[1][2].set_title("kpt_{} physical y".format(i))
 
+        f.savefig(os.path.join(output_dir,'{}_point_.png'.format(i)))
 

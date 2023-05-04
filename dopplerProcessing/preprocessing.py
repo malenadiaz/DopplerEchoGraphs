@@ -2,9 +2,9 @@ from dirsParser import parse_arguments_directories
 import cv2
 import random
 import numpy as np
-from utils import *
-from kpts_utils import *
-from visualization import draw_points_interactive, draw_img_interactive
+from dopplerProcessing.utils import *
+from dopplerProcessing.kpts_utils import *
+from dopplerProcessing.visualization import draw_points_interactive, draw_img_interactive
 
 def crop_image_cycles (pixel_array_rgb, cycle_metadata, margin=30):
 
@@ -40,17 +40,21 @@ def crop_image_cycles (pixel_array_rgb, cycle_metadata, margin=30):
     return crop_pixels, cycle_metadata     
 
 def process_image (img_file, output_file):
-
     ds = load_dicom(img_file)
     if ds is None: #controls if it is a dicom
+        return 0
+    if isSegmented(ds):
         return 0
     
     output_name_gen =  transform_name_no_dir (img_file) #get name 
     pixel_array_rgb = load_image(ds) #get pixel array
-    
+
     #get kpts and splines
-    final_points_x, final_points_y, labels = get_annotations(output_name_gen, json_data)
-    interp_x, interp_y = get_splines(img_file, json_data)
+    json = get_json_image(img_file, json_data)
+    patient = json["patient_id"]
+
+    final_points_x, final_points_y, labels = get_annotations(json)
+    interp_x, interp_y = get_splines(json)
     num_cycles = len(final_points_x)
 
     img_metadata = {}
@@ -85,7 +89,7 @@ def process_image (img_file, output_file):
         kpts_saved = save_kpts(kpts_x, kpts_y, kpts_labels, output_dir, output_name, NUM_KPTS, DIMS)
 
         #save the image if everything went well 
-        img_saved = cv2.imwrite(output_dir +"/frames/" + output_name + '.png', crop_pixels)
+        img_saved = cv2.imwrite(output_dir +"/frames/" + output_name + '.png', cv2.cvtColor(crop_pixels, cv2.COLOR_RGB2GRAY ))
         fig = draw_img_interactive(crop_pixels)
         draw_points_interactive(kpts_x, kpts_y, kpts_labels, fig)
         fig.write_html(output_dir +"/validations/" + output_name + '.html')
@@ -93,11 +97,14 @@ def process_image (img_file, output_file):
         #store the image metadata and name to the processed files file
         if kpts_saved and img_saved:
             patient_files.append(output_name)
-            img_metadata[str(i)] = cycle_metadata
 
+        img_metadata[str(i)] = cycle_metadata
     np.save( output_dir + '/metadata/' + output_name_gen + '.npy', img_metadata)
-    list_images.append(patient_files)
 
+    if patient in list_images.keys(): #check that we do not put same patient in test and train 
+        list_images[patient] = list_images[patient] + patient_files
+    else:
+        list_images[patient] = patient_files
 
 if __name__ == "__main__": 
     #dimensions
@@ -114,7 +121,7 @@ if __name__ == "__main__":
 
     input_dir, output_dir , json_path = parse_arguments_directories(json=True)
 
-    list_images = [] 
+    list_images = {} 
 
     #load json 
     json_data = load_json(json_path)
@@ -129,8 +136,10 @@ if __name__ == "__main__":
     _ = open_directory(input_dir, output_dir + '/frames', process_image)
 
     #distribute images
-    random.shuffle(list_images) 
-    # train_files, test_files, val_files, test_aux_files = distribute_dataset(output_dir,"doppCycle",list_images, TRAIN, TEST, VAL)
+    keys = list_images.keys()
+    random.shuffle(list(keys)) 
+    list_images_shuffled = [list_images[key] for key in keys]
+    train_files, test_files, val_files, test_aux_files = distribute_dataset(output_dir,"doppCycle",list_images_shuffled, TRAIN, TEST, VAL)
 
     number_patients_processed = len(list_images)
     number_images_created = len([img for patient in list_images for img in patient])
@@ -140,8 +149,8 @@ if __name__ == "__main__":
         fp0.write("{} images have been created.\n".format(number_images_created))
         fp0.write("The number of kpts is: {}.\n".format(NUM_KPTS))
         fp0.write("The dimenson is: {}.\n".format(DIMS))
-        # fp0.write("The train dataset has {} samples.\n".format(train_files))
-        # fp0.write("The test dataset has {} samples.\n".format(test_files))
-        # fp0.write("The validation dataset has {} samples.\n".format(val_files))
-        # fp0.write("The auxiliary test dataset has {} samples.\n".format(test_aux_files))
+        fp0.write("The train dataset has {} samples.\n".format(train_files))
+        fp0.write("The test dataset has {} samples.\n".format(test_files))
+        fp0.write("The validation dataset has {} samples.\n".format(val_files))
+        fp0.write("The auxiliary test dataset has {} samples.\n".format(test_aux_files))
 

@@ -96,5 +96,5 @@ class DopplerKpts(USKpts):
             metData = None
         return metData.item(), cycle
     
-    def get_labels(self, index:int):
+    def get_labels(self):
         return self.LABELS[0]

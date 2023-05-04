@@ -9,6 +9,7 @@ from fvcore.common.config import CfgNode
 
 from engine.loops import validate
 from engine.checkpoints import load_trained_model
+from evaluation.DopplerEvaluator import DopplerEvaluator
 from evaluation.EchonetEvaluator import EchonetEvaluator
 from datasets import datas, load_dataset
 from utils.utils_files import to_numpy
@@ -26,6 +27,7 @@ def eval_trained_model(model: torch.nn.Module, cfg: CfgNode, ds: datas,
                        basedir: str, basename: str, device: torch.device, batch_size: int, num_workers: int, num_examples_to_plot: int):
 
     # Load model:
+    print(device)
     model = model.to(device)
     dataset_name = cfg.EVAL.DATASET
     model_name = cfg.MODEL.NAME
@@ -56,7 +58,7 @@ def eval_trained_model(model: torch.nn.Module, cfg: CfgNode, ds: datas,
     # frames_info_file = pd.read_csv(ds.testset.echonet_frame_info_csvfile, index_col=0)
     # frames_info_file = frames_info_file[frames_info_file.Split == "TEST"]
 
-    evaluator = EchonetEvaluator(dataset=ds.testset, tasks=["kpts"], output_dir=out_directory)
+    evaluator =  DopplerEvaluator(dataset=ds.testset, output_dir=out_directory) if cfg.TRAIN.DATASET == 'doppler' else EchonetEvaluator(dataset=ds.testset, tasks=["kpts"], output_dir=out_directory)
     evaluator.process(test_inputs, test_outputs)
     evaluator.evaluate()
     evaluator.plot(num_examples_to_plot=min(num_examples_to_plot, len(test_outputs)))
@@ -150,10 +152,11 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_gpu = True if device == "cuda" else False
-    model, cfg_model, _ = load_trained_model(weights_filename=cfg_eval.EVAL.WEIGHTS, is_gpu=False)
+    print(is_gpu)
+    model, cfg_model, _ = load_trained_model(weights_filename=cfg_eval.EVAL.WEIGHTS)
     cfg = overwrite_eval_cfg(cfg_model,cfg_eval)
 
-    model = model.to(device)
+   # model = model.to(device)
     basedir = os.path.dirname(cfg.EVAL.WEIGHTS)
     basename = os.path.splitext(os.path.basename(cfg.EVAL.WEIGHTS))[0]
 
@@ -175,5 +178,6 @@ if __name__ == '__main__':
                             basedir=basedir,
                             basename=basename,
                             )
+
 
 

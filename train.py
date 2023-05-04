@@ -11,6 +11,7 @@ import CONST as CONST
 from engine.loops import sample_dataset, train_vanilla, validate
 from engine.checkpoints import save_model
 from evaluation.EchonetEvaluator import EchonetEvaluator
+from evaluation.DopplerEvaluator import DopplerEvaluator
 from models import load_model
 from losses import load_loss
 from datasets import load_dataset
@@ -111,7 +112,8 @@ def train(cfg):
     print("Training in batches of size {}..".format(cfg.TRAIN.BATCH_SIZE))
     print('Training on machine name {}..'.format(hostname))
     print("Using data augmentation type {} for {:.2f}% of the input data".format(cfg.AUG.METHOD, 100 * cfg.AUG.PROB))
-    evaluator = EchonetEvaluator(dataset=ds.valset, output_dir=None, verbose=False)
+    evaluator =  DopplerEvaluator(dataset=ds.valset, output_dir=None, verbose=False) if cfg.TRAIN.DATASET == 'doppler' else EchonetEvaluator(dataset=ds.valset, tasks=["kpts"], output_dir=None, verbose=False)
+
     with tqdm(total=cfg.TRAIN.EPOCHS) as pbar_main:
         for epoch in range(1, cfg.TRAIN.EPOCHS+1):
             pbar_main.update()
@@ -181,6 +183,12 @@ def train(cfg):
                         if task in ['ef', 'kpts']:
                             save_model(filename, epoch, model, cfg, train_loss, val_loss, best_val_metric, hostname)
                             print("Saved at val loss {:.5f}, {} error {:.5f}%\n".format(val_loss, task, eval_metrics[task]))
+                
+                if epoch % 100 == 0:
+                        filename = os.path.join(log_folder, 'epoch_{}_weights_{}_best_{}Err.pth'.format(epoch, basename, 'kpts'))
+                        save_model(filename, epoch, model, cfg, train_loss, val_loss, best_val_metric, hostname)
+                        print("Saved at val loss {:.5f}, {} error {:.5f}%\n".format(val_loss, 'kpts', eval_metrics['kpts']))
+                
 
 
     # Save & Close:

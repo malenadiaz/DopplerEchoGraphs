@@ -155,26 +155,25 @@ def detransform_y(y, cycle_metadata):
     temp = (y - cycle_metadata["y_shift"]) // cycle_metadata["ratio"]
     return temp - cycle_metadata["margin"] + cycle_metadata["min_y"] 
 
-def detransform_list(input_list, cycle_metadata, axis="x"):
+def detransform_list(input_list, cycle_metadata):
     output_list = []
-    function = detransform_x if axis == "x" else detransform_y
     for kpt in input_list:
-        output_list.append(function(kpt, cycle_metadata))
+        x = detransform_x(kpt[0], cycle_metadata)
+        y = detransform_y(kpt[1], cycle_metadata)
+        output_list.append([x,y])
     return output_list
 
 def to_physical_x(x, metadata):
-    return (x)  * metadata["physical_delta_x"]
+    return (x - metadata["min_x"])  * metadata["physical_delta_x"]
 
 def to_physical_y(y, metadata):
-    return (metadata["zero_line"] - (y )) * metadata["physical_delta_y"]
+    return (metadata["zero_line"] - (y - metadata["min_y"])) * metadata["physical_delta_y"]
 
-def to_physical_list(input_list, metadata, cycle, axis = "x" ):
+def to_physical_list(input_list, metadata ):
     output_list = []
     for kpt in input_list:
-        x = detransform_x(kpt[0], metadata[cycle])
-        x = to_physical_x(x, metadata['gen'])
-        y = detransform_y(kpt[1], metadata[cycle])
-        y = to_physical_y(y, metadata['gen'])
+        x = to_physical_x(kpt[0], metadata)
+        y = to_physical_y(kpt[1], metadata)
         output_list.append([x,y])
     return output_list
 

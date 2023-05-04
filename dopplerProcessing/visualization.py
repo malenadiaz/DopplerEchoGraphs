@@ -8,12 +8,12 @@ import scipy.interpolate as interpolate
 import numpy as np
 
 ## DRAW IMAGE
-def draw_image(img_path):
-    pixel_array_rgb = load_image(img_path)
-    if len(pixel_array_rgb.shape) == 4:
-        plt.imshow(pixel_array_rgb[0], interpolation='spline36')
-    else:
-        plt.imshow(pixel_array_rgb, interpolation='spline36')
+# def draw_image(img_path):
+#     pixel_array_rgb = load_image(img_path)
+#     if len(pixel_array_rgb.shape) == 4:
+#         plt.imshow(pixel_array_rgb[0], interpolation='spline36')
+#     else:
+#         plt.imshow(pixel_array_rgb, interpolation='spline36')
 
 #draw image interactive
 def draw_img_interactive(pixel_array):
@@ -59,7 +59,7 @@ def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=[], 
             gt_interpolate = interpolate.splev(unew, gt_tck)
     
     if pred_kpts is not None:
-        img = draw_kpts(img, gt_kpts*0.9, color=[255,0,0])
+        img = draw_kpts(img, pred_kpts, color=[255,0,0])
         try:
             pred_interpolate = generateSpline(pred_kpts[:, 0].astype("int"), pred_kpts[:, 1].astype("int"))
         except Exception as e:
@@ -77,7 +77,7 @@ def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=[], 
     if gt_kpts is not None:
         ax.plot(gt_interpolate[0], gt_interpolate[1], marker=None, linestyle = '-' , c='green')
     if pred_kpts is not None:
-        ax.plot(gt_interpolate[0], gt_interpolate[1], marker=None, linestyle = '-', c='red') # fixme: change color back to 'white'
+        ax.plot(pred_interpolate[0], pred_interpolate[1], marker=None, linestyle = '-', c='red') # fixme: change color back to 'white'
     ax.set_axis_off()
     
     ax = fig.add_subplot(1, 3, 3)
