@@ -19,6 +19,8 @@ from dopplerProcessing.visualization import  plot_kpts_pred_and_gt
 from dopplerProcessing.kpts_utils import to_physical_list, detransform_list
 from dopplerProcessing.stat_utils import stats_report_doppler, compute_kpts_err, stats_report_point_doppler, create_bland_altman, create_point_annotations_excel, compute_stats_original_points
 
+from utils.utils_stat import match_two_kpts_set
+
 class DopplerEvaluator(DatasetEvaluator):
     """
     Evaluate EchoNet segmentation predictions for a single iteration of the cardiac navigation model
@@ -154,6 +156,8 @@ class DopplerEvaluator(DatasetEvaluator):
         all_gt_kpts = []
         all_phys_gt_kpts = []
         img_paths = []
+        num_kpts = self._dataset.num_kpts
+        dist_pred_gt_kpts = [] 
 
         for prediction in predictions.values():
             datapoint_index = self._dataset.img_list.index(prediction["data_path_from_root"])
@@ -163,22 +167,22 @@ class DopplerEvaluator(DatasetEvaluator):
             gt_kpts = prediction["keypoints"]  * self._dataset.input_size
             pred_kpts = prediction["keypoints_prediction"] * self._dataset.input_size
 
-            #original pixeles from the image 
-            gt_kpts = detransform_list(gt_kpts, metadata[cycle])
-            pred_kpts = detransform_list(pred_kpts, metadata[cycle])
+            #keep normalized data
+            dist_pred_gt_kpts.append(100 * match_two_kpts_set(prediction["keypoints"].reshape(num_kpts , 2),
+                                                              prediction["keypoints_prediction"].reshape(num_kpts, 2)))
 
-            #convert to physical keypoints
+            all_gt_kpts.append(gt_kpts)
+            all_pred_kpts.append(pred_kpts)
+
+            #if evaluation mode on, convert to physical keypoints
             if report:
-                phys_gt_kpts = to_physical_list(gt_kpts, metadata['gen'])
-                phys_pred_kpts = to_physical_list(pred_kpts, metadata['gen'])
+                phys_gt_kpts = to_physical_list(detransform_list(gt_kpts, metadata[cycle]), metadata['gen'])
+                phys_pred_kpts = to_physical_list(detransform_list(pred_kpts, metadata[cycle]), metadata['gen'])
                 
                 all_phys_gt_kpts.append(phys_gt_kpts)
                 all_phys_pred_kpts.append(phys_pred_kpts)
 
                 img_paths.append(prediction["data_path_from_root"])
-
-            all_gt_kpts.append(gt_kpts)
-            all_pred_kpts.append(pred_kpts)
 
         all_gt_kpts = np.array(all_gt_kpts)
         all_pred_kpts = np.array(all_pred_kpts)
@@ -198,7 +202,7 @@ class DopplerEvaluator(DatasetEvaluator):
             #df2 = stats_report_point_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels,img_paths)
             #create_point_annotations_excel(all_pred_kpts, all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, labels, img_paths, self._output_dir)
             
-            create_bland_altman(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
+            #create_bland_altman(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
 
             file_path = os.path.join(self._output_dir, "stats_report.csv")
             df.to_csv(file_path, sep=";", decimal=",")
@@ -206,14 +210,16 @@ class DopplerEvaluator(DatasetEvaluator):
             # file_path = os.path.join(self._output_dir, "stats_og_report.csv")
             # df2.to_csv(file_path, sep=";", decimal=",")
 
-            mKptsERR = df.loc["PIX MSE"]["TOTAL"]
+            mKptsERR_real = df.loc["PIX MSE"]["TOTAL"]
             
         else:
-            mKptsERR = compute_kpts_err(all_pred_kpts, all_gt_kpts)
+            mKptsERR_real = compute_kpts_err(all_pred_kpts, all_gt_kpts)
+        
+        mKptsERR_norm = np.mean(np.stack(dist_pred_gt_kpts))
 
         if self._verbose:
-            self._logger.info("Mean keypoints error is {}".format(mKptsERR))
-        return mKptsERR
+            self._logger.info("Mean keypoints error is {}".format(mKptsERR_real))
+        return {'real':mKptsERR_real, 'norm':mKptsERR_norm}
 
 
     def _plot_kpts_single_frame(self, fig, data_path_from_root, keypoints_prediction):

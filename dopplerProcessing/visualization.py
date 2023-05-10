@@ -7,6 +7,11 @@ from dopplerProcessing.rkt_spline_module import generateSpline
 import scipy.interpolate as interpolate
 import numpy as np
 
+
+COLORS = [(0, 0, 255), (255, 127, 0), (255, 70, 0), (0, 174, 174), (186, 0, 255), 
+          (255, 255, 0), (204, 0, 175), (255, 0, 0), (0, 255, 0), (115, 8, 165), 
+          (254, 179, 0), (0, 121, 0), (0, 0, 255)]
+
 ## DRAW IMAGE
 # def draw_image(img_path):
 #     pixel_array_rgb = load_image(img_path)
@@ -18,6 +23,18 @@ import numpy as np
 #draw image interactive
 def draw_img_interactive(pixel_array):
     return px.imshow(pixel_array)
+
+def draw_kpts_plt(kpts_x, kpts_y, ax):
+    ax.plot(kpts_x, kpts_y,"ro")
+    return ax
+
+def save_img_annotated(pix, kpts_x, kpts_y, output_dir):
+    fig = plt.gcf()
+    fig.clf()
+    ax = plt.gca()
+    plt.imshow(pix, interpolation='spline36')
+    ax = draw_kpts_plt(kpts_x, kpts_y, ax)
+    plt.savefig(output_dir)
 
 #draw points 
 def draw_points_interactive(final_points_x, final_points_y, labels, fig):    
@@ -33,13 +50,17 @@ def draw_points_interactive(final_points_x, final_points_y, labels, fig):
         )
     )
 
-def draw_kpts(img, kpts, color = [0,255,0]):
+def draw_kpts(img, kpts, mode = 'gt'):
     im = img.copy() # workaround a bug in Python OpenCV wrapper: https://stackoverflow.com/questions/30249053/python-opencv-drawing-errors-after-manipulating-array-with-numpy
     # draw points
-    for k in kpts:
+    for i in range(len(kpts)):
+        k = kpts[i]
         x = int(k[0])
         y = int(k[1])
-        cv2.circle(im, (x, y), radius=3, thickness=-1, color=color)
+        if mode == 'gt':
+            im = cv2.rectangle(im, (x-2, y-2), (x+2, y+2), COLORS[i], 1) 
+        else:
+            im = cv2.circle(im, (x, y), radius=3, thickness=-1, color=COLORS[i])
     return im
 
 def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=[], closed_contour=False):
@@ -51,7 +72,7 @@ def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=[], 
     unew = np.arange(0, 1.00, interpolation_step_size)
 
     if gt_kpts is not None:
-        img = draw_kpts(img, gt_kpts, color=[0,255,0])
+        img = draw_kpts(img, gt_kpts, mode='gt')
         try:
             gt_interpolate = generateSpline(gt_kpts[:, 0].astype("int"), gt_kpts[:, 1].astype("int"))
         except Exception as e:
@@ -59,7 +80,7 @@ def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=[], 
             gt_interpolate = interpolate.splev(unew, gt_tck)
     
     if pred_kpts is not None:
-        img = draw_kpts(img, pred_kpts, color=[255,0,0])
+        img = draw_kpts(img, pred_kpts, mode='pred')
         try:
             pred_interpolate = generateSpline(pred_kpts[:, 0].astype("int"), pred_kpts[:, 1].astype("int"))
         except Exception as e:

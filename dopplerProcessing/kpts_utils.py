@@ -81,7 +81,7 @@ def create_kpt(xPrev,xNext, yPrev,yNext, interp_x, interp_y, prev_idx_top):
                   xNext, 
                   yPrev, 
                   yNext) + idx_floor 
-    return interp_x[res], interp_y[res], idx_top
+    return interp_x[res], interp_y[res], idx_top, idx_floor
 
 #computes the kpts 
 def compute_kpts(final_points_x, final_points_y, interp_x, interp_y, labels, desired_labels):
@@ -98,26 +98,30 @@ def compute_kpts(final_points_x, final_points_y, interp_x, interp_y, labels, des
             kpts_x.append(final_points_x[i])
             kpts_y.append(final_points_y[i])
             kpts_labels.append(labels[i])
-
+            
+            prev = i
             i += 1
             desired_idx += 1 
 
             if i > len(final_points_x) - 1 or desired_idx > len(desired_labels) - 1:
                 break
+
+            while labels[i] == 'mid_control_point' or labels[i] == 'mid deceleration point': #ignore mid control points
+                i += 1
                 
             #create a key point
-            xKpt, yKpt, curr_top = create_kpt(final_points_x[i-1],final_points_x[i],
-                                   final_points_y[i-1],final_points_y[i],
+            xKpt, yKpt, curr_top, curr_floor = create_kpt(final_points_x[prev],final_points_x[i],
+                                   final_points_y[prev],final_points_y[i],
                                    interp_x, interp_y, curr_top)
             kpts_x.append(xKpt)
             kpts_y.append(yKpt)
             kpts_labels.append("spline_point")
 
-            if labels[i]!= desired_labels[desired_idx] and desired_labels[desired_idx] == "diastolic peak":
-                xKpt2, yKpt2, curr_top = create_kpt(kpts_x[-2],kpts_x[-1],
+            if (labels[i]!= desired_labels[desired_idx] and desired_labels[desired_idx] == "diastolic peak") or labels[i] == 'ejection end':
+                xKpt2, yKpt2, curr_top, curr_floor = create_kpt(kpts_x[-2],kpts_x[-1],
                        kpts_y[-2],kpts_y[-1],
-                       interp_x, interp_y, curr_top)
-                xKpt3, yKpt3, curr_top = create_kpt(kpts_x[-1],final_points_x[i],
+                       interp_x, interp_y, curr_floor)
+                xKpt3, yKpt3, curr_top, curr_floor = create_kpt(kpts_x[-1],final_points_x[i],
                        kpts_y[-1], final_points_y[i],
                        interp_x, interp_y, curr_top)
                 kpts_x = kpts_x + [xKpt2, xKpt3]

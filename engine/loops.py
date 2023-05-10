@@ -104,8 +104,8 @@ def validate(mode: str,
             #     losses["ef"].update(batch_loss["reported_ef_loss"], len(filenames))
             # if "reported_sd_loss" in batch_loss:
             #     losses["sd"].update(batch_loss["reported_sd_loss"], len(filenames))
-            # if "reported_kpts_loss" in batch_loss:
-            #     losses["kpts"].update(batch_loss["reported_kpts_loss"], len(filenames))
+            if "reported_kpts_loss" in batch_loss:
+                losses["kpts"].update(batch_loss["reported_kpts_loss"], len(filenames))
 
             # accumulate outputs nad inputs:
             for ii, filename in enumerate(filenames):

@@ -4,7 +4,7 @@ import random
 import numpy as np
 from dopplerProcessing.utils import *
 from dopplerProcessing.kpts_utils import *
-from dopplerProcessing.visualization import draw_points_interactive, draw_img_interactive
+from dopplerProcessing.visualization import save_img_annotated
 
 def crop_image_cycles (pixel_array_rgb, cycle_metadata, margin=30):
 
@@ -90,9 +90,7 @@ def process_image (img_file, output_file):
 
         #save the image if everything went well 
         img_saved = cv2.imwrite(output_dir +"/frames/" + output_name + '.png', cv2.cvtColor(crop_pixels, cv2.COLOR_RGB2GRAY ))
-        fig = draw_img_interactive(crop_pixels)
-        draw_points_interactive(kpts_x, kpts_y, kpts_labels, fig)
-        fig.write_html(output_dir +"/validations/" + output_name + '.html')
+        save_img_annotated(crop_pixels, kpts_x, kpts_y, output_dir +"/validations/" + output_name + '.png')
 
         #store the image metadata and name to the processed files file
         if kpts_saved and img_saved:

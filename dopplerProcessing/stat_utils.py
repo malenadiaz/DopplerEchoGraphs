@@ -98,9 +98,18 @@ def stats_report_point_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts,
 
     return df
 
+def spline_point_count(labels):
+    counter = 0 
+    for i in range(len(labels)):
+        if labels[i] == 'spline_point':
+            labels[i] = labels[i] +'_'+ str(counter)
+            counter += 1
+    return labels 
 
 def create_point_annotations_excel(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, labels, dict_keys, output_dir):
     columns= []
+    labels = spline_point_count(labels)
+
     for lbl in labels:
         columns.append(lbl + '_REAL_X')
         columns.append(lbl + '_PREDICTED_X')

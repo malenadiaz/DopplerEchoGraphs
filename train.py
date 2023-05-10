@@ -47,7 +47,7 @@ def train(cfg):
         is_gpu = True
     else:
         is_gpu = False
-    print(device)
+
     config_dict = convert_to_dict(cfg,[])
 
     # ----- Load data -----:
@@ -139,9 +139,13 @@ def train(cfg):
                                                                prossesID=run_id)
                 val_loss = val_losses["main"].avg
                 writer.add_scalar('Loss/Validation', val_loss, epoch)
-                for task in ['ef', 'sd', 'kpts']:
-                    if task in val_losses:
-                        writer.add_scalar("Loss/{}_Validation".format(task), val_losses[task].avg, epoch)
+                
+                #ECHONET
+                # for task in ['ef', 'sd', 'kpts']:
+                #     if task in val_losses:
+                #DOPPLER
+                task = 'kpts'
+                writer.add_scalar("Loss/{}_Validation".format(task), val_losses[task].avg, epoch)
 
                 # Stats:
                 # some_val_output_item = next(iter(val_outputs.items()))[1]
@@ -163,9 +167,15 @@ def train(cfg):
 
                 evaluator.process(val_inputs, val_outputs)
                 eval_metrics = evaluator.evaluate()
-                for task in ['ef', 'sd', 'kpts']:
-                    if task in evaluator.get_tasks():
-                        writer.add_scalar("Val/{}ERR".format(task, task), eval_metrics[task], epoch)
+
+                #ECHONET 
+                # for task in ['ef', 'sd', 'kpts']:
+                #     if task in evaluator.get_tasks():
+                #         writer.add_scalar("Val/{}ERR".format(task, task), eval_metrics[task], epoch)
+
+                #DOPPLER PROCESSING
+                writer.add_scalar("Val/{}ERR".format('kpts_norm'), eval_metrics['kpts']['norm'], epoch)
+                writer.add_scalar("Val/{}ERR".format('kpts_real'), eval_metrics['kpts']['real'], epoch)
 
                 if val_loss < best_val_loss:
                     filename = os.path.join(log_folder, 'weights_{}_best_loss.pth'.format(basename))
@@ -176,18 +186,20 @@ def train(cfg):
 
                 # Update best val metric:
                 for task in ['ef', 'sd', 'kpts']:
-                    if task in eval_metrics and eval_metrics[task] < best_val_metric[task]:
-                        filename = os.path.join(log_folder, 'weights_{}_best_{}Err.pth'.format(basename, task))
-                        best_val_metric[task] = eval_metrics[task]
-                        writer.add_scalar("BestVal/{}Err".format(task), best_val_metric[task], epoch)
-                        if task in ['ef', 'kpts']:
-                            save_model(filename, epoch, model, cfg, train_loss, val_loss, best_val_metric, hostname)
-                            print("Saved at val loss {:.5f}, {} error {:.5f}%\n".format(val_loss, task, eval_metrics[task]))
-                
+                    if task in eval_metrics:
+                        metric = eval_metrics[task]['norm'] if task == 'kpts' else eval_metrics[task] #DOPPLER
+                        if  metric < best_val_metric[task]:
+                            filename = os.path.join(log_folder, 'weights_{}_best_{}Err.pth'.format(basename, task))
+                            best_val_metric[task] = metric
+                            writer.add_scalar("BestVal/{}Err".format(task), best_val_metric[task], epoch)
+                            if task in ['ef', 'kpts']:
+                                save_model(filename, epoch, model, cfg, train_loss, val_loss, best_val_metric, hostname)
+                                print("Saved at val loss {:.5f}, {} error {:.5f}%\n".format(val_loss, task, metric))
+                    
                 if epoch % 100 == 0:
-                        filename = os.path.join(log_folder, 'epoch_{}_weights_{}_best_{}Err.pth'.format(epoch, basename, 'kpts'))
-                        save_model(filename, epoch, model, cfg, train_loss, val_loss, best_val_metric, hostname)
-                        print("Saved at val loss {:.5f}, {} error {:.5f}%\n".format(val_loss, 'kpts', eval_metrics['kpts']))
+                    filename = os.path.join(log_folder, 'epoch_{}_weights_{}_best_{}Err_{}.pth'.format(epoch, basename, 'kpts', eval_metrics['kpts']['norm']))
+                    save_model(filename, epoch, model, cfg, train_loss, val_loss, best_val_metric, hostname)
+                    print("Saved at val loss {:.5f}, {} error {:.5f}%\n".format(val_loss, 'kpts', eval_metrics['kpts']['norm']))
                 
 
 
