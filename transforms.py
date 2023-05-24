@@ -15,7 +15,7 @@ def load_transform(augmentation_type: str, augmentation_probability: float, inpu
 
     if augmentation_type == "strongkeep":
         input_transformer = A.Compose([
-            HorizontalFlipKeepIndexOrder(p=0.5),
+            A.VerticalFlip(p=0.5),
             A.OneOf(
                 [
                     A.ShiftScaleRotate(shift_limit=0.15, scale_limit=0.3, rotate_limit=45,

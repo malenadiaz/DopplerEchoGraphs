@@ -3,6 +3,7 @@ import json
 from pydicom import dcmread
 import cv2
 import plotly.graph_objects as go
+import matplotlib as mpl
 import matplotlib.pyplot  as plt
 import plotly.express as px
 import math
@@ -11,14 +12,23 @@ import numpy as np
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error
 import statsmodels.api as sm
 import os 
+from dopplerProcessing.rkt_spline_module import generateSpline
+
+def mse_error_2dim(gt, preds):
+    res =  np.sum((preds[:,0] - gt[:,0])**2 + (preds[:,1] - gt[:,1])**2)
+    res = res/preds.shape[0]
+    res = np.sqrt(res)
+    return res
 
 def pulsatily_idx(kpts):
     return (max(kpts) - min(kpts)) / np.mean(kpts)
 
-def get_pulsatily_idx(pred_kpts, gt_kpts, err_metric):
+def get_pulsatily_idx(pred_kpts, gt_kpts):
     pred_pul_idx = np.apply_along_axis(pulsatily_idx, 1, pred_kpts[:,:,1])
     gt_pul_idx = np.apply_along_axis(pulsatily_idx, 1, gt_kpts[:,:,1])
-    return err_metric(pred_pul_idx, gt_pul_idx)
+    if np.any(pred_pul_idx<0) or np.any(gt_pul_idx<0):
+        print('PUL IDX IS NEGATIVE', np.mean(pred_kpts[:,:,1].flatten()), np.mean(gt_kpts[:,:,1].flatten()) )
+    return pred_pul_idx, gt_pul_idx
 
 def get_pulsatility_idx_point(pred_kpts, gt_kpts, err_metric):
     pred_pul_idx = np.apply_along_axis(pulsatily_idx, 1, pred_kpts[:,:,1] )
@@ -31,12 +41,12 @@ def get_pulsatility_idx_point(pred_kpts, gt_kpts, err_metric):
 def ejection_time(kpts, beg_idx, end_idx):
     return kpts[end_idx] - kpts[beg_idx]
 
-def get_ejection_time(pred_kpts, gt_kpts, labels, err_metric):
+def get_ejection_time(pred_kpts, gt_kpts, labels):
     beg_index = next((index for index, label in enumerate(labels) if label  == 'ejection beginning'), -1)
     end_index = next((index for index, label in enumerate(labels) if label  == 'maximum velocity'), -1)
-    pred_pul_idx = np.apply_along_axis(ejection_time, 1, pred_kpts[:,:,0],beg_index, end_index)
-    gt_pul_idx = np.apply_along_axis(ejection_time, 1,gt_kpts[:,:,0], beg_index, end_index)
-    return err_metric(pred_pul_idx, gt_pul_idx)
+    pred_eje_time = np.apply_along_axis(ejection_time, 1, pred_kpts[:,:,0],beg_index, end_index)
+    gt_eje_time = np.apply_along_axis(ejection_time, 1,gt_kpts[:,:,0], beg_index, end_index)
+    return  pred_eje_time, gt_eje_time
 
 def get_ejection_time_point(pred_kpts, gt_kpts, labels, err_metric):
     beg_index = next((index for index, label in enumerate(labels) if label  == 'ejection beginning'), -1)
@@ -47,6 +57,11 @@ def get_ejection_time_point(pred_kpts, gt_kpts, labels, err_metric):
     for i in range(len(pred_kpts)):
         res.append(err_metric([gt_eje_time[i]],[pred_eje_time[i]]))
     return res
+
+def get_maximum_velocity(pred_kpts, gt_kpts):
+    pred_max_vel = np.amax(pred_kpts, axis=1)[:,1]
+    gt_max_vel = np.amax(gt_kpts, axis=1)[:,1]
+    return pred_max_vel, gt_max_vel
 
 def get_metric(pred_kpts, gt_kpts, metric):
     res = []
@@ -59,8 +74,12 @@ def compute_mse(pred_kpts, gt_kpts):
     return mean_squared_error(gt_kpts, pred_kpts)
 
 def compute_kpts_err(pred_kpts, gt_kpts):
-    return mean_squared_error(gt_kpts.flatten(), pred_kpts.flatten(),)
-
+    total = []
+    for i in range(len(pred_kpts[0])):
+        total.append(mean_squared_error(gt_kpts[:,i,:], pred_kpts[:,i,:], multioutput='raw_values', squared=False)) #returns array of shape [13, 2]
+    total = np.array(total)
+    all_points = np.mean(total, 1) 
+    return np.mean(all_points)
 
 def load_pickle(path):
     with open(path,'rb') as fp:
@@ -148,36 +167,47 @@ def compute_stats_original_points(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kp
 
     return stats_report_doppler(pred_kpts[:,og_idxs,:], gt_kpts[:,og_idxs,:], phys_pred_kpts[:,og_idxs,:], phys_gt_kpts[:,og_idxs,:], og_lbls)
 
-def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, labels):
-    pf = pd.DataFrame(columns= ['TOTAL'] + labels ,
-                       index=["PIX MAPE", "PIX MAPE X", "PIX MAPE Y" 
-                            ,"PIX MSE", "PIX MSE X", "PIX MSE Y" 
-                            ,"PHYS MAPE", "PHYS MAPE X", "PHYS MAPE Y"
-                            ,"PHYS MSE", "PHYS MSE X","PHYS MSE Y" 
-                            ,"PUL IDX MAPE", "PUL IDX MSE"
-                            ,"EJE TIME MAPE", "EJE TIME MSE"])
+def rmse_report(pred_kpts, gt_kpts, df, type = 'PIX'):
+    #compute per point per axis
+    total_per_dim = []
+    total_per_point = []
+    for i in range(len(pred_kpts[0])):
+        total_per_dim.append(mean_squared_error(gt_kpts[:,i,:], pred_kpts[:,i,:], multioutput='raw_values', squared=False)) #returns array of shape [13, 2]
+        total_per_point.append(mse_error_2dim(gt_kpts[:,i,:], pred_kpts[:,i,:]))
+    total_per_dim = np.array(total_per_dim)
     
-    pf.loc["PIX MAPE"] = get_metric(pred_kpts, gt_kpts, mean_absolute_percentage_error)
-    pf.loc["PIX MAPE X"] = get_metric(pred_kpts,gt_kpts,  mean_absolute_percentage_error)
-    pf.loc["PIX MAPE Y"] = get_metric(pred_kpts,gt_kpts,  mean_absolute_percentage_error)
+    total_x = mean_squared_error(gt_kpts[:,:,0].flatten(), pred_kpts[:,:,0].flatten(), squared=False)
+    total_y = mean_squared_error(gt_kpts[:,:,1].flatten(), pred_kpts[:,:,1].flatten(), squared=False)
+    total = mse_error_2dim(gt_kpts.reshape(-1,2), pred_kpts.reshape(-1,2))
 
-    pf.loc["PIX MSE"] = get_metric( pred_kpts, gt_kpts, mean_squared_error)
-    pf.loc["PIX MSE X"] = get_metric( pred_kpts[:,:,0], gt_kpts[:,:,0], mean_squared_error)
-    pf.loc["PIX MSE Y"] = get_metric( pred_kpts[:,:,1], gt_kpts[:,:,1], mean_squared_error)
+    df.loc[type + ' RMSE X'] = np.insert(total_per_dim[:,0], 0, total_x) #shape [13 + 1, 1] 
+    df.loc[type + ' RMSE Y'] = np.insert(total_per_dim[:,1], 0, total_y) #shape [13 + 1, 1] 
+    
+    df.loc[type + ' RMSE'] = np.insert(total_per_point, 0, total) #does mean of array all_points
 
-    pf.loc["PHYS MAPE"] = get_metric(phys_pred_kpts, phys_gt_kpts, mean_absolute_percentage_error)
-    pf.loc["PHYS MAPE X"] = get_metric( phys_pred_kpts[:,:,0],phys_gt_kpts[:,:,0], mean_absolute_percentage_error)
-    pf.loc["PHYS MAPE Y"] = get_metric( phys_pred_kpts[:,:,1],phys_gt_kpts[:,:,1], mean_absolute_percentage_error)
+    return df
 
-    pf.loc["PHYS MSE"] = get_metric(phys_pred_kpts, phys_gt_kpts, mean_squared_error)
-    pf.loc["PHYS MSE X"] = get_metric(phys_pred_kpts[:,:,0], phys_gt_kpts[:,:,0], mean_squared_error)
-    pf.loc["PHYS MSE Y"] = get_metric(phys_pred_kpts[:,:,1],phys_gt_kpts[:,:,1],  mean_squared_error)
+def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, labels):
+    labels = spline_point_count(labels)
+    pf = pd.DataFrame(columns= ['TOTAL'] + labels ,
+                       index=[#"PIX MAPE", "PIX MAPE X", "PIX MAPE Y" 
+                            "PIX RMSE", "PIX RMSE X", "PIX RMSE Y" 
+                            #,"PHYS MAPE", "PHYS MAPE X", "PHYS MAPE Y"
+                            ,"PHYS RMSE", "PHYS RMSE X","PHYS RMSE Y" 
+                            ,"PUL IDX MAPE", "PUL IDX RMSE"
+                            ,"EJE TIME MAPE", "EJE TIME RMSE"])
 
-    pf.loc[["PUL IDX MAPE"],["TOTAL"]] = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts, mean_absolute_percentage_error)
-    pf.loc[["PUL IDX MSE"],["TOTAL"]] = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts, mean_squared_error)
+    pf = rmse_report(pred_kpts, gt_kpts, pf, type ='PIX')
+
+    pf = rmse_report(phys_pred_kpts, phys_gt_kpts, pf, type ='PHYS')
+
+    pred_pul_idx, gt_pul_idx = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts)
+    pf.loc[["PUL IDX MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_pul_idx,pred_pul_idx)
+    pf.loc[["PUL IDX RMSE"],["TOTAL"]] = mean_squared_error(gt_pul_idx,pred_pul_idx, squared=False )
    
-    pf.loc[["EJE TIME MAPE"],["TOTAL"]] = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels, mean_absolute_percentage_error)
-    pf.loc[["EJE TIME MSE"],["TOTAL"]] = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels, mean_squared_error)
+    pred_eje_time, gt_eje_time = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels)
+    pf.loc[["EJE TIME MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_eje_time, pred_eje_time)
+    pf.loc[["EJE TIME RMSE"],["TOTAL"]] = mean_squared_error(gt_eje_time, pred_eje_time, squared=False)
     
     pf = pf.astype(float)
 
@@ -186,51 +216,38 @@ def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, label
 
     return pf
 
-def create_bland_altman(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels, output_dir):    
-    
-    f, ax = plt.subplots(1,2, figsize = (25, 20))
-    sm.graphics.mean_diff_plot(all_gt_kpts.flatten(), all_pred_kpts.flatten(), ax = ax[0])
-    ax[0].set_title("All points pixel-wise")
-    sm.graphics.mean_diff_plot(all_phys_gt_kpts.flatten(), all_phys_pred_kpts.flatten(), ax = ax[1])
-    ax[1].set_title("All points physical")
-    f.savefig(os.path.join(output_dir,'ALL_points.png'))
+def create_bland_altman(phys_pred_kpts, phys_gt_kpts, labels, output_dir):
+    with mpl.rc_context({'font.size': 25}):  
+        #maximum velocity bland altman 
+        plt.clf()
+        ax = plt.gca()
+        pred_max_vel, gt_max_vel = get_maximum_velocity(phys_pred_kpts, phys_gt_kpts)
+        sm.graphics.mean_diff_plot(gt_max_vel, pred_max_vel, ax = ax, font_size = 22)
+        ax.set_title("Maximum Velocity")
+        plt.savefig(os.path.join(output_dir,'max_vel_BA.png'))
 
-    f.clf()
-    f, ax = plt.subplots(1,2, figsize = (25, 20))
-    sm.graphics.mean_diff_plot(all_gt_kpts[:,:,0].flatten(), all_pred_kpts[:,:,0].flatten(), ax = ax[0])
-    ax[0].set_title("X points pixel-wise")
-    sm.graphics.mean_diff_plot(all_gt_kpts[:,:,1].flatten(), all_pred_kpts[:,:,1].flatten(), ax = ax[1])
-    ax[1].set_title("Y points pixel-wise")
-    f.savefig(os.path.join(output_dir,'XY_points_pixel.png'))
- 
-    f.clf()
-    f, ax = plt.subplots(1,2, figsize = (25, 20))
-    sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,:,0].flatten(), all_phys_pred_kpts[:,:,0].flatten(), ax = ax[0])
-    ax[0].set_title("X points physical")
-    sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,:,1].flatten(), all_phys_pred_kpts[:,:,1].flatten(), ax = ax[1])
-    ax[1].set_title("X points physical")
-    f.savefig(os.path.join(output_dir,'XY_points_physical.png'))
+        plt.clf()
+        ax = plt.gca()
+        pred_pul_idx, gt_pul_idx = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts)
+        sm.graphics.mean_diff_plot(gt_pul_idx, pred_pul_idx, ax = ax, font_size = 22)
+        ax.set_title("Pulsatility Index")
+        plt.savefig(os.path.join(output_dir,'pul_idx_BA.png'))
 
-    ##########
-    
-    num_kpts = len(all_pred_kpts[0])
+        plt.clf()
+        ax = plt.gca()
+        pred_eje_time, gt_eje_time = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels)
+        sm.graphics.mean_diff_plot(gt_eje_time, pred_eje_time, ax = ax, font_size = 22)
+        ax.set_title("Ejection time")
+        plt.savefig(os.path.join(output_dir,'eje_time_BA.png'))
 
-    for i in range(num_kpts):
-        f.clf()
-        f, ax = plt.subplots(nrows=2, ncols=3, figsize=(25,25))
-
-        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,:].flatten(), all_pred_kpts[:,i,:].flatten(), ax = ax[0][0])
-        ax[0][0].set_title("kpt_{} pixel x and y".format(i))
-        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,0].flatten(), all_pred_kpts[:,i,0].flatten(), ax = ax[0][1])
-        ax[0][1].set_title("kpt_{} pixel x".format(i))
-        sm.graphics.mean_diff_plot(all_gt_kpts[:,i,1].flatten(), all_pred_kpts[:,i,1].flatten(), ax = ax[0][2])
-        ax[0][2].set_title("kpt_{} pixel y".format(i))
-        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,:].flatten(), all_phys_pred_kpts[:,i,:].flatten(), ax = ax[1][0])
-        ax[1][0].set_title("kpt_{} physical x and y".format(i))
-        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,0].flatten(), all_phys_pred_kpts[:,i,0].flatten(), ax = ax[1][1])
-        ax[1][1].set_title("kpt_{} physical x".format(i))
-        sm.graphics.mean_diff_plot(all_phys_gt_kpts[:,i,1].flatten(), all_phys_pred_kpts[:,i,1].flatten(), ax = ax[1][2])
-        ax[1][2].set_title("kpt_{} physical y".format(i))
-
-        f.savefig(os.path.join(output_dir,'{}_point_.png'.format(i)))
-
+def count_inversions(predKpts, img_paths, output_dir):
+    inversions = 0
+    text = ""
+    for i, pred in enumerate(predKpts):
+        if not np.all(np.diff(pred[:,0]) >= 0):
+            inversions += 1
+            text += "\nInversion in image {}".format(img_paths[i])
+            text += np.array2string(pred[:,0])
+    text = "\nTotal number of inverted images: {} \n\n ".format(inversions) + text
+    with open(os.path.join(output_dir, "inversions.txt"), "w") as fp:
+        fp.write(text)

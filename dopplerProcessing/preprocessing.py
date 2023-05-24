@@ -6,6 +6,7 @@ from dopplerProcessing.utils import *
 from dopplerProcessing.kpts_utils import *
 from dopplerProcessing.visualization import save_img_annotated
 
+
 def crop_image_cycles (pixel_array_rgb, cycle_metadata, margin=30):
 
     min_x, min_y, max_x, max_y = cycle_metadata["min_x"], cycle_metadata["min_y"], cycle_metadata["max_x"], cycle_metadata["max_y"]
@@ -81,17 +82,26 @@ def process_image (img_file, output_file):
 
         #compute kpts 
         kpts_x, kpts_y, kpts_labels = compute_kpts(cicle_points_x, 
+                                            cicle_points_y,
+                                            cicle_interp_x, 
+                                            cicle_interp_y, 
+                                            labels[i], DESIRED_LABELS)
+
+        kpts_x_2, kpts_y_2, kpts_labels_2 = compute_kpts_wo_added(cicle_points_x, 
                                                    cicle_points_y,
                                                    cicle_interp_x, 
                                                    cicle_interp_y, 
                                                    labels[i], DESIRED_LABELS)
-        
-        kpts_saved = save_kpts(kpts_x, kpts_y, kpts_labels, output_dir, output_name, NUM_KPTS, DIMS)
+        kpts_x_d = np.insert(np.diff(kpts_x),0, (kpts_x[0]))
+
+        kpts_saved = save_kpts(kpts_x, kpts_y, kpts_labels, output_dir, output_name,'/annotations/', NUM_KPTS, DIMS)
+        kpts_saved_2 = save_kpts(kpts_x_2, kpts_y_2, kpts_labels_2, output_dir, output_name,'/annotations_wo_add/', (NUM_KPTS + 1) // 2, DIMS)
+        kpts_saved_3 = save_kpts(kpts_x_d, kpts_y, kpts_labels, output_dir, output_name,'/annotations_diff/', NUM_KPTS, DIMS)
 
         #save the image if everything went well 
         img_saved = cv2.imwrite(output_dir +"/frames/" + output_name + '.png', cv2.cvtColor(crop_pixels, cv2.COLOR_RGB2GRAY ))
         save_img_annotated(crop_pixels, kpts_x, kpts_y, output_dir +"/validations/" + output_name + '.png')
-
+        
         #store the image metadata and name to the processed files file
         if kpts_saved and img_saved:
             patient_files.append(output_name)
@@ -115,7 +125,7 @@ if __name__ == "__main__":
     assert TRAIN + TEST_AUX + TEST + VAL == 1, "The percentages should add up to one."
 
     DESIRED_LABELS = ['ejection beginning', 'mid upstroke', 'maximum velocity','mid deceleration point', 'ejection end', 'diastolic peak', 'ejection beginning']
-    NUM_KPTS = len(DESIRED_LABELS)*2-1
+    NUM_KPTS = len(DESIRED_LABELS) * 2 - 1
 
     input_dir, output_dir , json_path = parse_arguments_directories(json=True)
 
@@ -127,6 +137,8 @@ if __name__ == "__main__":
     #create directories
     create_dir(output_dir + '/frames')
     create_dir(output_dir + '/annotations')
+    create_dir(output_dir + '/annotations_wo_add')
+    create_dir(output_dir + '/annotations_diff')
     create_dir(output_dir + '/metadata')
     create_dir(output_dir + '/filenames')
     create_dir(output_dir + '/validations')

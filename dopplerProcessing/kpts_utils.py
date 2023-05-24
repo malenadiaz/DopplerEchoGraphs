@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from dopplerProcessing.rkt_spline_module import generateSpline
 
 #function to get points and labels
 def get_annotations(json):
@@ -95,6 +96,7 @@ def compute_kpts(final_points_x, final_points_y, interp_x, interp_y, labels, des
     while i < len(labels) :
         if labels[i] == desired_labels[desired_idx]:
             mid_points = 0
+
             kpts_x.append(final_points_x[i])
             kpts_y.append(final_points_y[i])
             kpts_labels.append(labels[i])
@@ -108,7 +110,7 @@ def compute_kpts(final_points_x, final_points_y, interp_x, interp_y, labels, des
 
             while labels[i] == 'mid_control_point' or labels[i] == 'mid deceleration point': #ignore mid control points
                 i += 1
-                
+
             #create a key point
             xKpt, yKpt, curr_top, curr_floor = create_kpt(final_points_x[prev],final_points_x[i],
                                    final_points_y[prev],final_points_y[i],
@@ -118,19 +120,24 @@ def compute_kpts(final_points_x, final_points_y, interp_x, interp_y, labels, des
             kpts_labels.append("spline_point")
 
             if (labels[i]!= desired_labels[desired_idx] and desired_labels[desired_idx] == "diastolic peak") or labels[i] == 'ejection end':
+                
                 xKpt2, yKpt2, curr_top, curr_floor = create_kpt(kpts_x[-2],kpts_x[-1],
                        kpts_y[-2],kpts_y[-1],
                        interp_x, interp_y, curr_floor)
+                kpts_x.insert(-1, xKpt2)
+                kpts_y.insert(-1 ,yKpt2 )
                 xKpt3, yKpt3, curr_top, curr_floor = create_kpt(kpts_x[-1],final_points_x[i],
                        kpts_y[-1], final_points_y[i],
                        interp_x, interp_y, curr_top)
-                kpts_x = kpts_x + [xKpt2, xKpt3]
-                kpts_y = kpts_y + [yKpt2, yKpt3]
+                kpts_x.append(xKpt3)
+                kpts_y.append(yKpt3)
                 kpts_labels = kpts_labels + ["spline_point", "spline_point"] 
                 desired_idx += 1
         else:
             i += 1
     return kpts_x, kpts_y, kpts_labels
+
+
 
 #scales the x kpts
 def transform_x(x, cycle_metadata):
@@ -171,7 +178,7 @@ def to_physical_x(x, metadata):
     return (x - metadata["min_x"])  * metadata["physical_delta_x"]
 
 def to_physical_y(y, metadata):
-    return (metadata["zero_line"] - (y - metadata["min_y"])) * metadata["physical_delta_y"]
+    return np.abs((metadata["zero_line"] - (y - metadata["min_y"])) * metadata["physical_delta_y"])
 
 def to_physical_list(input_list, metadata ):
     output_list = []
@@ -181,7 +188,7 @@ def to_physical_list(input_list, metadata ):
         output_list.append([x,y])
     return output_list
 
-def save_kpts(kpts_x, kpts_y, kpts_labels, output_dir, output_name, NUM_KPTS, DIMS):
+def save_kpts(kpts_x, kpts_y, kpts_labels, output_dir, output_name,folder, NUM_KPTS, DIMS):
     if any(x > DIMS[0] and x < 0 for x in kpts_x ) or  any(y > DIMS[1] and y < 0 for y in kpts_y ):
         print("Error in" + output_name + " in key points construction.")
         return False
@@ -190,6 +197,83 @@ def save_kpts(kpts_x, kpts_y, kpts_labels, output_dir, output_name, NUM_KPTS, DI
         print("Image" + output_name + "has more or less keypoints than needed.")
         return False
     else:
-        np.save( output_dir + '/annotations/' + output_name + '.npy', 
+        np.save( output_dir + folder + output_name + '.npy', 
                 np.column_stack((np.column_stack((kpts_x, kpts_y)), kpts_labels)))
     return True
+
+#computes the kpts 
+def compute_kpts_wo_added(final_points_x, final_points_y, interp_x, interp_y, labels, desired_labels):
+    kpts_x = []
+    kpts_y = []
+    kpts_labels = []
+    desired_idx = 0 
+    i = 0
+    curr_top = 0
+
+    while i < len(labels) :
+        if labels[i] == desired_labels[desired_idx]:
+            mid_points = 0
+            kpts_x.append(final_points_x[i])
+            kpts_y.append(final_points_y[i])
+            kpts_labels.append(labels[i])
+            
+            prev = i
+            i += 1
+            desired_idx += 1 
+
+            if i > len(final_points_x) - 1 or desired_idx > len(desired_labels) - 1:
+                break
+            if (labels[i]!= desired_labels[desired_idx] and desired_labels[desired_idx] == "diastolic peak"):
+                floor = np.where(np.array(interp_x) == final_points_x[i-1])[0][0]
+                xKpt2, yKpt2, curr_top, curr_floor = create_kpt(final_points_x[i-1],final_points_x[i],
+                       final_points_y[i-1],final_points_y[i],
+                       interp_x, interp_y, floor)
+                kpts_x = kpts_x + [xKpt2]
+                kpts_y = kpts_y + [yKpt2]
+                kpts_labels = kpts_labels + ["spline_point"] 
+                desired_idx += 1
+        else:
+            i += 1
+    return kpts_x, kpts_y, kpts_labels
+
+def diff2real(kpts):
+    new_x = np.cumsum(kpts[:,0])
+    new_kpts = np.column_stack((new_x, kpts[:,1]))
+    return new_kpts
+
+
+def pardiff2real(kpts, labels):
+    new_kpts = []
+    last_idx = 0
+    kpts_x = kpts[:,0]
+    kpts_y = kpts[:,1]
+
+    sp_points = [] 
+    sp_points_y = []
+    for i in range(len(kpts_x)):
+        if labels[i] not in ["ejection beginning", "maximum velocity", "ejection end"]:
+            sp_points.append(kpts_x[i] + kpts_x[last_idx])
+            sp_points_y.append(kpts_y[i])
+        else:
+            if sp_points != []:
+                new_kpts += np.column_stack((sp_points, sp_points_y)).tolist()
+                sp_points = []
+                sp_points_y = []
+                last_idx = i
+            new_kpts.append([kpts_x[i], kpts_y[i]])
+    return np.array(new_kpts)
+
+def compute_splines(gt_kpts, pred_kpts, img_path):
+    gt_interpolate, pred_interpolate = None,None
+    if gt_kpts is not None:
+        try:
+            gt_interpolate = generateSpline(gt_kpts.astype("int"), gt_kpts.astype("int"))
+        except Exception as e:
+            print("Exception generating gt spline for image {}:{}".format(img_path, e))
+    
+    if pred_kpts is not None:
+        try:
+            pred_interpolate = generateSpline(pred_kpts.astype("int"), pred_kpts.astype("int"))
+        except Exception as e:
+            print("Exception generating pred spline for image {}:{}".format(img_path, e))
+    return gt_interpolate, pred_interpolate

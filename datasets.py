@@ -6,7 +6,7 @@ from typing import Dict
 from data.USKpts import USKpts
 from data.USKptsNPZ import USKptsNPZ
 from data.USKpts_EchoNet import USKpts_EchoNet
-from data.USKpts_Malena import USKpts_MAL
+from data.DopplerKpts import DopplerKpts
 from transforms import load_transform
 from utils.utils_files import copy_train_data
 
@@ -136,15 +136,15 @@ def load_dataset(ds_name: str, input_transform: A.core.composition.Compose = Non
         frame_selection_mode = 'all'#'edToEs'
         nb_classes, closed_contour = 40, False
 
-    elif ds_name == 'malena':
-        loader_func = USKpts_MAL
+    elif ds_name == 'doppler':
+        loader_func = DopplerKpts
         img_dirname = os.path.join(us_data_folder, "frames/")
-        anno_dirname = os.path.join(us_data_folder, "annotations/")
-        train_filenames_list = os.path.join(us_data_folder, 'filenames/malena_train_filenames.txt')
-        val_filenames_list = os.path.join(us_data_folder, 'filenames/malena_val_filenames.txt')
-        test_filenames_list = os.path.join(us_data_folder, 'filenames/malena_test_filenames.txt')
+        anno_dirname = os.path.join(us_data_folder, "annotations_wo_add/")
+        train_filenames_list = os.path.join(us_data_folder, 'filenames/doppCycle_train_filenames.txt')
+        val_filenames_list = os.path.join(us_data_folder, 'filenames/doppCycle_val_filenames.txt')
+        test_filenames_list = os.path.join(us_data_folder, 'filenames/doppCycle_test_aux_filenames.txt')
         frame_selection_mode = None
-        nb_classes, closed_contour = 13, False
+        nb_classes, closed_contour = 7, False
 
     else:
         raise NotImplementedError("Can't use dataset {}.".format(ds_name))

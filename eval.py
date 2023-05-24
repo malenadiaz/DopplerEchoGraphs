@@ -14,6 +14,9 @@ from evaluation.EchonetEvaluator import EchonetEvaluator
 from datasets import datas, load_dataset
 from utils.utils_files import to_numpy
 from config.defaults import cfg_costum_setup, default_argument_parser,overwrite_eval_cfg
+import torch.onnx
+from torchsummary import summary
+
 
 def sliding():
     mode = 'sliding_window'
@@ -27,7 +30,6 @@ def eval_trained_model(model: torch.nn.Module, cfg: CfgNode, ds: datas,
                        basedir: str, basename: str, device: torch.device, batch_size: int, num_workers: int, num_examples_to_plot: int):
 
     # Load model:
-    print(device)
     model = model.to(device)
     dataset_name = cfg.EVAL.DATASET
     model_name = cfg.MODEL.NAME
@@ -151,12 +153,12 @@ if __name__ == '__main__':
     cfg_eval = cfg_costum_setup(args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    is_gpu = True if device == "cuda" else False
-    print(is_gpu)
+    is_gpu = True if torch.cuda.is_available() else False
     model, cfg_model, _ = load_trained_model(weights_filename=cfg_eval.EVAL.WEIGHTS)
     cfg = overwrite_eval_cfg(cfg_model,cfg_eval)
-
-   # model = model.to(device)
+    model = model.to(device)
+    #x = torch.randn(32, 3, 300, 300, requires_grad=True, device="cuda")
+    summary(model, (3, 300, 300))
     basedir = os.path.dirname(cfg.EVAL.WEIGHTS)
     basename = os.path.splitext(os.path.basename(cfg.EVAL.WEIGHTS))[0]
 

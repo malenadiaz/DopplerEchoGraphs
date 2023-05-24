@@ -16,8 +16,8 @@ from datasets import datas
 from .BaseEvaluator import DatasetEvaluator
 from dopplerProcessing.visualization import  plot_kpts_pred_and_gt
 
-from dopplerProcessing.kpts_utils import to_physical_list, detransform_list
-from dopplerProcessing.stat_utils import stats_report_doppler, compute_kpts_err, stats_report_point_doppler, create_bland_altman, create_point_annotations_excel, compute_stats_original_points
+from dopplerProcessing.kpts_utils import to_physical_list, detransform_list, pardiff2real
+from dopplerProcessing.stat_utils import stats_report_doppler, compute_kpts_err, stats_report_point_doppler, create_bland_altman, create_point_annotations_excel, compute_stats_original_points, count_inversions
 
 from utils.utils_stat import match_two_kpts_set
 
@@ -121,12 +121,13 @@ class DopplerEvaluator(DatasetEvaluator):
         return copy.deepcopy(self._results)
 
     def plot(self, num_examples_to_plot: int) -> None:
-        fig = plt.figure(constrained_layout=True, figsize=(16, 16))
+        fig = plt.figure(constrained_layout=True, figsize=(16, 8))
         plot_directory = os.path.join(self._output_dir, "plots")
         if os.path.exists(plot_directory):
             shutil.rmtree(plot_directory)
         os.makedirs(plot_directory)
         self._logger.info("plotting {} prediction examples to {}".format(num_examples_to_plot, plot_directory))
+        random.seed(2)
         for data_path in random.sample(list(self._predictions), num_examples_to_plot):
             prediction = self._predictions[data_path]
             fig.clf()
@@ -164,8 +165,9 @@ class DopplerEvaluator(DatasetEvaluator):
             metadata,cycle = self._dataset.get_metadata(datapoint_index)
 
             #denormalize keypoints from 0-1 to 0-size of image
-            gt_kpts = prediction["keypoints"]  * self._dataset.input_size
-            pred_kpts = prediction["keypoints_prediction"] * self._dataset.input_size
+            gt_kpts = np.array(prediction["keypoints"])  * self._dataset.input_size
+            pred_kpts = np.array(prediction["keypoints_prediction"]) * self._dataset.input_size
+
 
             #keep normalized data
             dist_pred_gt_kpts.append(100 * match_two_kpts_set(prediction["keypoints"].reshape(num_kpts , 2),
@@ -202,15 +204,14 @@ class DopplerEvaluator(DatasetEvaluator):
             #df2 = stats_report_point_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels,img_paths)
             #create_point_annotations_excel(all_pred_kpts, all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, labels, img_paths, self._output_dir)
             
-            #create_bland_altman(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
+            create_bland_altman(all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
 
             file_path = os.path.join(self._output_dir, "stats_report.csv")
             df.to_csv(file_path, sep=";", decimal=",")
 
-            # file_path = os.path.join(self._output_dir, "stats_og_report.csv")
-            # df2.to_csv(file_path, sep=";", decimal=",")
+            count_inversions(all_pred_kpts, img_paths, self._output_dir)
 
-            mKptsERR_real = df.loc["PIX MSE"]["TOTAL"]
+            mKptsERR_real = df.loc["PIX RMSE"]["TOTAL"]
             
         else:
             mKptsERR_real = compute_kpts_err(all_pred_kpts, all_gt_kpts)
@@ -234,7 +235,8 @@ class DopplerEvaluator(DatasetEvaluator):
         keypoints = self._dataset.denormalize_pose(keypoints, img)
 
         plot_kpts_pred_and_gt(fig, img, gt_kpts=keypoints, pred_kpts=keypoints_prediction,
-                              kpts_info=self._dataset.kpts_info, closed_contour=self._dataset.kpts_info['closed_contour'])
+                              kpts_info=self._dataset.get_labels(), img_path = data["img_path"],
+                              colors = self._dataset.get_colors())
 
         #prediction_text = "Keypoints err: {:.2f}".format(np.mean(dist_pred_gt_kpts[img_index]))
         return fig

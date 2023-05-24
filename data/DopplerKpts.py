@@ -17,7 +17,10 @@ class DopplerKpts(USKpts):
         self.LABELS = []
 
         super().__init__(dataset_config, filenames_list, transform)
-        self.metadata_dir = self.anno_dir.replace("annotations", "metadata")
+        self.metadata_dir = self.img_folder.replace("frames", "metadata")
+        self.COLORS = [(0, 0, 255), (255, 127, 0), (255, 70, 0), (0, 174, 174), (186, 0, 255), 
+          (255, 255, 0), (204, 0, 175), (255, 0, 0), (0, 255, 0), (115, 8, 165), 
+          (254, 179, 0), (0, 121, 0), (0, 0, 255)]
         
     def create_img_list(self, filenames_list: str) -> None:
         """
@@ -68,7 +71,10 @@ class DopplerKpts(USKpts):
         img = cv2.imread(img_path)
         kpts = np.zeros([self.num_kpts, 2])     # default
         if self.anno_dir is not None:
+            #pos = [i for i in range(5)] +[6] + [i for i in range(8,13)] #select 11pts
+            #pos = [i for i in range(0,13,2)] #select even points
             kpts = self.KP_COORDS[index].astype(int)
+
 
         # resize to DNN input size:
         ratio = [self.input_size / float(img.shape[1]), self.input_size / float(img.shape[0])]
@@ -97,4 +103,8 @@ class DopplerKpts(USKpts):
         return metData.item(), cycle
     
     def get_labels(self):
+        #pos = [i for i in range(0,13,2)]
         return self.LABELS[0]
+    
+    def get_colors(self):
+        return self.COLORS

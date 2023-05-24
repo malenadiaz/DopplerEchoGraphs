@@ -1,5 +1,5 @@
 import math
-from utils import get_json_image
+from dopplerProcessing.utils import get_json_image
 import numpy as np
 
 #function to get points and labels
