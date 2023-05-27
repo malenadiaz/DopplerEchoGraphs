@@ -9,7 +9,7 @@ import plotly.express as px
 import math
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error
+from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, auc
 import statsmodels.api as sm
 import os 
 from dopplerProcessing.rkt_spline_module import generateSpline
@@ -24,10 +24,11 @@ def pulsatily_idx(kpts):
     return (max(kpts) - min(kpts)) / np.mean(kpts)
 
 def get_pulsatily_idx(pred_kpts, gt_kpts):
-    pred_pul_idx = np.apply_along_axis(pulsatily_idx, 1, pred_kpts[:,:,1])
-    gt_pul_idx = np.apply_along_axis(pulsatily_idx, 1, gt_kpts[:,:,1])
+    pred_pul_idx = np.array([pulsatily_idx(pred[:,1]) for pred in pred_kpts])
+    gt_pul_idx = np.array([pulsatily_idx(gt[:,1]) for gt in gt_kpts])
     if np.any(pred_pul_idx<0) or np.any(gt_pul_idx<0):
         print('PUL IDX IS NEGATIVE', np.mean(pred_kpts[:,:,1].flatten()), np.mean(gt_kpts[:,:,1].flatten()) )
+    
     return pred_pul_idx, gt_pul_idx
 
 def get_pulsatility_idx_point(pred_kpts, gt_kpts, err_metric):
@@ -47,6 +48,11 @@ def get_ejection_time(pred_kpts, gt_kpts, labels):
     pred_eje_time = np.apply_along_axis(ejection_time, 1, pred_kpts[:,:,0],beg_index, end_index)
     gt_eje_time = np.apply_along_axis(ejection_time, 1,gt_kpts[:,:,0], beg_index, end_index)
     return  pred_eje_time, gt_eje_time
+
+def get_vit(pred_splines, gt_splines):
+    pred_vit = [auc(spline[:,0], spline[:,1]) for spline in pred_splines]
+    gt_vit = [auc(spline[:,0], spline[:,1]) for spline in gt_splines]
+    return pred_vit, gt_vit
 
 def get_ejection_time_point(pred_kpts, gt_kpts, labels, err_metric):
     beg_index = next((index for index, label in enumerate(labels) if label  == 'ejection beginning'), -1)
@@ -187,7 +193,7 @@ def rmse_report(pred_kpts, gt_kpts, df, type = 'PIX'):
 
     return df
 
-def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, labels):
+def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, gt_splines, pred_splines, labels):
     labels = spline_point_count(labels)
     pf = pd.DataFrame(columns= ['TOTAL'] + labels ,
                        index=[#"PIX MAPE", "PIX MAPE X", "PIX MAPE Y" 
@@ -195,19 +201,24 @@ def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, label
                             #,"PHYS MAPE", "PHYS MAPE X", "PHYS MAPE Y"
                             ,"PHYS RMSE", "PHYS RMSE X","PHYS RMSE Y" 
                             ,"PUL IDX MAPE", "PUL IDX RMSE"
-                            ,"EJE TIME MAPE", "EJE TIME RMSE"])
+                            ,"EJE TIME MAPE", "EJE TIME RMSE"
+                            ,"VIT MAPE", "VIT RMSE"])
 
     pf = rmse_report(pred_kpts, gt_kpts, pf, type ='PIX')
 
     pf = rmse_report(phys_pred_kpts, phys_gt_kpts, pf, type ='PHYS')
 
-    pred_pul_idx, gt_pul_idx = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts)
+    pred_pul_idx, gt_pul_idx = get_pulsatily_idx(pred_splines, gt_splines)
     pf.loc[["PUL IDX MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_pul_idx,pred_pul_idx)
     pf.loc[["PUL IDX RMSE"],["TOTAL"]] = mean_squared_error(gt_pul_idx,pred_pul_idx, squared=False )
    
     pred_eje_time, gt_eje_time = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels)
     pf.loc[["EJE TIME MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_eje_time, pred_eje_time)
     pf.loc[["EJE TIME RMSE"],["TOTAL"]] = mean_squared_error(gt_eje_time, pred_eje_time, squared=False)
+    
+    pred_vit, gt_vit = get_vit(pred_splines, gt_splines)
+    pf.loc[["VIT MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_vit, pred_vit)
+    pf.loc[["VIT RMSE"],["TOTAL"]] = mean_squared_error(gt_vit, pred_vit, squared=False)
     
     pf = pf.astype(float)
 
@@ -251,3 +262,5 @@ def count_inversions(predKpts, img_paths, output_dir):
     text = "\nTotal number of inverted images: {} \n\n ".format(inversions) + text
     with open(os.path.join(output_dir, "inversions.txt"), "w") as fp:
         fp.write(text)
+
+

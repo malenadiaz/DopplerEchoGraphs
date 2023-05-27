@@ -50,8 +50,8 @@ def get_region (ds):
 def get_img_metadata(ds):
     metadata = {}
     region = get_region (ds)
-    metadata['min_x'] = region.ReferencePixelY0 if hasattr(region,"RegionLocationMinX0") else None
-    metadata['min_y'] = region.ReferencePixelY0 if hasattr(region,"RegionLocationMinY0") else None
+    metadata['min_x'] = region.RegionLocationMinX0 if hasattr(region,"RegionLocationMinX0") else None
+    metadata['min_y'] = region.RegionLocationMinY0 if hasattr(region,"RegionLocationMinY0") else None
     metadata['zero_line'] = region.ReferencePixelY0 if hasattr(region,"ReferencePixelY0") else None
     metadata['physical_delta_x']  = region.PhysicalDeltaX if hasattr(region,"PhysicalDeltaX") else None
     metadata['physical_delta_y']  = region.PhysicalDeltaY if hasattr(region,"PhysicalDeltaY") else None

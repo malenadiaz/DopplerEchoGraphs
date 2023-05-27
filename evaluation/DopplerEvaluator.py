@@ -16,9 +16,8 @@ from datasets import datas
 from .BaseEvaluator import DatasetEvaluator
 from dopplerProcessing.visualization import  plot_kpts_pred_and_gt
 
-from dopplerProcessing.kpts_utils import to_physical_list, detransform_list, pardiff2real
+from dopplerProcessing.kpts_utils import to_physical_list, detransform_list, pardiff2real, compute_splines
 from dopplerProcessing.stat_utils import stats_report_doppler, compute_kpts_err, stats_report_point_doppler, create_bland_altman, create_point_annotations_excel, compute_stats_original_points, count_inversions
-
 from utils.utils_stat import match_two_kpts_set
 
 class DopplerEvaluator(DatasetEvaluator):
@@ -159,6 +158,8 @@ class DopplerEvaluator(DatasetEvaluator):
         img_paths = []
         num_kpts = self._dataset.num_kpts
         dist_pred_gt_kpts = [] 
+        all_gt_splines = []
+        all_pred_splines = []
 
         for prediction in predictions.values():
             datapoint_index = self._dataset.img_list.index(prediction["data_path_from_root"])
@@ -168,14 +169,13 @@ class DopplerEvaluator(DatasetEvaluator):
             gt_kpts = np.array(prediction["keypoints"])  * self._dataset.input_size
             pred_kpts = np.array(prediction["keypoints_prediction"]) * self._dataset.input_size
 
-
             #keep normalized data
             dist_pred_gt_kpts.append(100 * match_two_kpts_set(prediction["keypoints"].reshape(num_kpts , 2),
                                                               prediction["keypoints_prediction"].reshape(num_kpts, 2)))
 
             all_gt_kpts.append(gt_kpts)
             all_pred_kpts.append(pred_kpts)
-
+ 
             #if evaluation mode on, convert to physical keypoints
             if report:
                 phys_gt_kpts = to_physical_list(detransform_list(gt_kpts, metadata[cycle]), metadata['gen'])
@@ -183,6 +183,20 @@ class DopplerEvaluator(DatasetEvaluator):
                 
                 all_phys_gt_kpts.append(phys_gt_kpts)
                 all_phys_pred_kpts.append(phys_pred_kpts)
+                
+                gt_spline, pred_spline = compute_splines(gt_kpts, pred_kpts, prediction["data_path_from_root"])
+                gt_spline = np.column_stack(gt_spline)
+                pred_spline = np.column_stack(pred_spline)
+                phys_gt_spline = to_physical_list(detransform_list(gt_spline, metadata[cycle]), metadata['gen'])
+                phys_pred_spline = to_physical_list(detransform_list(pred_spline, metadata[cycle]), metadata['gen'])
+
+                if not np.all(np.array(phys_gt_spline) > 0): #check
+                    print(prediction["data_path_from_root"])
+                if not np.all(np.array(phys_pred_spline) > 0): #check
+                    print(prediction["data_path_from_root"])
+
+                all_gt_splines.append(np.array(phys_gt_spline))
+                all_pred_splines.append(np.array(phys_pred_spline))
 
                 img_paths.append(prediction["data_path_from_root"])
 
@@ -196,14 +210,10 @@ class DopplerEvaluator(DatasetEvaluator):
             
             all_phys_gt_kpts = np.array(all_phys_gt_kpts)
             all_phys_pred_kpts = np.array(all_phys_pred_kpts)
+
             labels = self._dataset.get_labels().tolist()
 
-            df = stats_report_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels)
-            
-            #df2 = compute_stats_original_points(all_pred_kpts, all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, labels)
-            #df2 = stats_report_point_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts,labels,img_paths)
-            #create_point_annotations_excel(all_pred_kpts, all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, labels, img_paths, self._output_dir)
-            
+            df = stats_report_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, all_gt_splines, all_pred_splines,labels)
             create_bland_altman(all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
 
             file_path = os.path.join(self._output_dir, "stats_report.csv")

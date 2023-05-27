@@ -175,7 +175,8 @@ def detransform_list(input_list, cycle_metadata):
     return output_list
 
 def to_physical_x(x, metadata):
-    return (x - metadata["min_x"])  * metadata["physical_delta_x"]
+    res =  (x - metadata["min_x"])  * metadata["physical_delta_x"]
+    return res
 
 def to_physical_y(y, metadata):
     return np.abs((metadata["zero_line"] - (y - metadata["min_y"])) * metadata["physical_delta_y"])
@@ -266,14 +267,20 @@ def pardiff2real(kpts, labels):
 def compute_splines(gt_kpts, pred_kpts, img_path):
     gt_interpolate, pred_interpolate = None,None
     if gt_kpts is not None:
-        try:
-            gt_interpolate = generateSpline(gt_kpts.astype("int"), gt_kpts.astype("int"))
-        except Exception as e:
-            print("Exception generating gt spline for image {}:{}".format(img_path, e))
-    
+        gt_interpolate = generateSpline(gt_kpts[:,0].astype("int"), gt_kpts[:,1].astype("int"))
+
     if pred_kpts is not None:
-        try:
-            pred_interpolate = generateSpline(pred_kpts.astype("int"), pred_kpts.astype("int"))
-        except Exception as e:
-            print("Exception generating pred spline for image {}:{}".format(img_path, e))
+        pred_interpolate = generateSpline(pred_kpts[:,0].astype("int"), pred_kpts[:,1].astype("int"))
     return gt_interpolate, pred_interpolate
+
+def list_compute_spline(all_pred_kpts, all_gt_kpts, img_paths):
+    gt_spline_list = []
+    pred_spline_list = []
+    valid_pos = []
+    for i in range(len(all_pred_kpts[0])):
+        gt_spline, pred_spline = compute_splines(all_gt_kpts[i], all_pred_kpts[i], img_paths[i])
+        if gt_spline is not None and pred_spline is not None:
+            valid_pos.append(i)
+            gt_spline_list.append(gt_spline)
+            pred_spline_list.append(pred_spline)
+    return gt_spline_list, pred_spline_list, valid_pos

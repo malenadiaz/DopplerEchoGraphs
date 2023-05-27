@@ -88,6 +88,7 @@ def interpolateCubicHermite(xeval, xbp, ybp, method, tension):
     
     return f
 def generateSpline(x, y):
+
     interpolationmethod = 'FritschButland' # Linear, FiniteDifference, Cardinal, FritschCarlson, FritschButland, Steffen
     interpolationtension = 0.5
     xx = np.linspace(x[0], x[len(x)-1], x[len(x)-1]-x[0])

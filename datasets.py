@@ -142,7 +142,7 @@ def load_dataset(ds_name: str, input_transform: A.core.composition.Compose = Non
         anno_dirname = os.path.join(us_data_folder, "annotations_wo_add/")
         train_filenames_list = os.path.join(us_data_folder, 'filenames/doppCycle_train_filenames.txt')
         val_filenames_list = os.path.join(us_data_folder, 'filenames/doppCycle_val_filenames.txt')
-        test_filenames_list = os.path.join(us_data_folder, 'filenames/doppCycle_test_aux_filenames.txt')
+        test_filenames_list = os.path.join(us_data_folder, 'filenames/doppCycle_test_filenames.txt')
         frame_selection_mode = None
         nb_classes, closed_contour = 7, False
 
