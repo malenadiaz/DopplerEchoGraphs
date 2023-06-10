@@ -21,9 +21,31 @@ def load_trained_model(weights_filename: str = None, is_gpu:bool = True, load_da
         if 'cfg' in checkpoint:
             print(checkpoint['cfg'])
             cfg = checkpoint['cfg']
+            model = load_model(cfg, False)
+
+            # Identify the layer names until 'image_encoder'
+            layer_names = []
+            for name, _ in model.named_parameters():
+                if name.startswith('image_encoder'):   
+                    layer_names.append(name)
+                else:
+                    break
+            state_dict = checkpoint['model_state_dict']
+            # Create a new state_dict containing only the specified layers' weights
+            filtered_state_dict = {name: weight for name, weight in state_dict.items() if any(layer_name in name for layer_name in layer_names)}
+
+            # Load the filtered weights into the model
+            model.load_state_dict(filtered_state_dict, strict=False)  # Set strict=False to ignore missing/badly shaped keys
+            
+            # Freeze the specified layers
+            for name, param in model.named_parameters():
+                if any(layer_name in name for layer_name in layer_names):
+                    param.requires_grad = False
+
             if load_dataset_from_checkpoint == True:
+
                 ds = load_dataset(cfg.TRAIN.DATASET, input_transform=None, input_size=cfg.TRAIN.INPUT_SIZE, num_frames=cfg.NUM_FRAMES)
-            model = load_model(cfg, is_gpu)
+
             model.load_state_dict(checkpoint['model_state_dict'])
             if 'current_train_loss' in checkpoint:
                 print('current_train_loss = %.6f' % checkpoint['current_train_loss'])

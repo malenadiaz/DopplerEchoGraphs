@@ -11,6 +11,31 @@ from nets.EFGCNTmp import EFGCNTmp
 from nets.EFGCNSD import EFGCNSD
 import os
 
+def load_freezed_encoder(weights_filename, cfg, model):
+        weights_filename = cfg.TRAIN.CHECKPOINT_FILE_PATH
+        print("loading file %s.." % weights_filename)
+        checkpoint = torch.load(weights_filename)
+        # Identify the layer names until 'image_encoder'
+        layer_names = []
+        for name, _ in model.named_parameters():
+            if name.startswith('image_encoder'):   
+                layer_names.append(name)
+            else:
+                break
+        state_dict = checkpoint['model_state_dict']
+        
+        # Create a new state_dict containing only the specified layers' weights
+        filtered_state_dict = {name: weight for name, weight in state_dict.items() if any(layer_name in name for layer_name in layer_names)}
+
+        # Load the filtered weights into the model
+        model.load_state_dict(filtered_state_dict, strict=False)  # Set strict=False to ignore missing/badly shaped keys
+        
+        # Freeze the specified layers
+        for name, param in model.named_parameters():
+            if any(layer_name in name for layer_name in layer_names):
+                param.requires_grad = False
+        return model
+
 def load_freezed_model(weights_filename: str=None, is_gpu: bool = True,continue_train: bool = False):
     model = None
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

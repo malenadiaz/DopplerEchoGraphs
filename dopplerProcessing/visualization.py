@@ -102,21 +102,38 @@ def plot_kpts_pred_and_gt(fig, img, gt_kpts=None, pred_kpts=None, kpts_info=None
 
     #pos =  [i for i, s in enumerate(kpts_info) if 'spline_point' not in s]
     #pos = range(0, gt_kpts.shape[0], 2)
-    pos = range(7)
+    gt_kpts_all = gt_kpts
+    pred_kpts_all = pred_kpts
+    if len(gt_kpts) > 7:
+        pos = list(range(0,13,2))
+    else:
+        pos = list(range(7))
+    gt_kpts = gt_kpts[pos, :].astype("int")
+    pred_kpts = pred_kpts[pos, : ].astype("int")
+
+    # Iterate through the array
+    for i in range(len(gt_kpts) - 1):
+        if gt_kpts[i][0] == gt_kpts[i + 1][0]:
+            gt_kpts[i + 1][0] += 1
+    for i in range(len(pred_kpts) - 1):
+        if pred_kpts[i][0] == pred_kpts[i + 1][0]:
+            pred_kpts[i + 1][0] += 1
+
     if gt_kpts is not None:
-        img = draw_kpts(img, gt_kpts, mode='gt', colors=colors)
+        img = draw_kpts(img, gt_kpts_all, mode='gt', colors=colors)
+
         try:
-            gt_interpolate = generateSpline(gt_kpts[pos, 0].astype("int"), gt_kpts[pos, 1].astype("int"))
-        except Exception as e:
+            gt_interpolate = generateSpline(gt_kpts[:,0], gt_kpts[:,1])
+        except:
             print("Exception generating gt spline for image {}:{}".format(img_path, e))
             gt_tck, _ = interpolate.splprep([gt_kpts[pos, 0], gt_kpts[pos, 1]], s=0)
             gt_interpolate = interpolate.splev(unew, gt_tck)
-    
+
     if pred_kpts is not None:
-        img = draw_kpts(img, pred_kpts, mode='pred', colors=colors)
+        img = draw_kpts(img, pred_kpts_all, mode='pred', colors=colors)
         try:
-            pred_interpolate = generateSpline(pred_kpts[pos, 0].astype("int"), pred_kpts[pos, 1].astype("int"))
-        except Exception as e:
+            pred_interpolate = generateSpline(pred_kpts[:,0], pred_kpts[:,1])
+        except:
             print("Exception generating pred spline for image {}:{}".format(img_path, e))
             pred_tck, _ = interpolate.splprep([pred_kpts[pos, 0], pred_kpts[pos, 1]], s=0)
             pred_interpolate = interpolate.splev(unew, pred_tck)

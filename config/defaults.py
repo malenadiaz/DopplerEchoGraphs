@@ -35,7 +35,7 @@ _C.TRAIN.EPOCHS = 100000
 _C.TRAIN.EVAL_INTERVAL = 1
 
 # Path to the checkpoint to load the initial weight.
-_C.TRAIN.CHECKPOINT_FILE_PATH = ""
+_C.TRAIN.CHECKPOINT_FILE_PATH = None
 
 _C.TRAIN.OVERFIT = False
 

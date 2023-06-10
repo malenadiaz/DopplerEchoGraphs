@@ -1,4 +1,4 @@
 EVAL:
-  WEIGHTS: './echoNet/EchoGraphs/echonet/storage/logs/doppler/CNNGCNV3/RadImageNet_resnet50/430110612/weights_doppler_CNNGCNV3_best_kptsErr.pth'
+  WEIGHTS: './echonet/storage/logs/doppler/CNNGCNV3/RadImageNet_resnet50/430110612/weights_doppler_CNNGCNV3_best_kptsErr.pth'
   INPUT_SIZE: 300
   EXAMPLES_TO_PLOT: 5

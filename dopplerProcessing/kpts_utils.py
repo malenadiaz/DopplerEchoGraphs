@@ -266,11 +266,32 @@ def pardiff2real(kpts, labels):
 
 def compute_splines(gt_kpts, pred_kpts, img_path):
     gt_interpolate, pred_interpolate = None,None
+    if len(gt_kpts) > 7:
+        pos = list(range(0,13,2))
+    else:
+        pos = list(range(7))
+    gt_kpts = gt_kpts[pos, :].astype("int")
+    pred_kpts = pred_kpts[pos, : ].astype("int")
+    # Iterate through the array
+    for i in range(len(gt_kpts) - 1):
+        if gt_kpts[i][0] == gt_kpts[i + 1][0]:
+            gt_kpts[i + 1][0] += 1
+    for i in range(len(pred_kpts) - 1):
+        if pred_kpts[i][0] == pred_kpts[i + 1][0]:
+            pred_kpts[i + 1][0] += 1
+
     if gt_kpts is not None:
-        gt_interpolate = generateSpline(gt_kpts[:,0].astype("int"), gt_kpts[:,1].astype("int"))
+        try:
+            gt_interpolate = generateSpline(gt_kpts[:,0], gt_kpts[:,1])
+        except:
+            print(gt_kpts[:,0], gt_kpts[:,1], "\n")
 
     if pred_kpts is not None:
-        pred_interpolate = generateSpline(pred_kpts[:,0].astype("int"), pred_kpts[:,1].astype("int"))
+        try:
+            pred_interpolate = generateSpline(pred_kpts[:,0], pred_kpts[:,1])
+        except:
+            print(pred_kpts[:,0], pred_kpts[:,1], "\n")
+
     return gt_interpolate, pred_interpolate
 
 def list_compute_spline(all_pred_kpts, all_gt_kpts, img_paths):

@@ -16,7 +16,7 @@ from datasets import datas
 from .BaseEvaluator import DatasetEvaluator
 from dopplerProcessing.visualization import  plot_kpts_pred_and_gt
 
-from dopplerProcessing.kpts_utils import to_physical_list, detransform_list, pardiff2real, compute_splines
+from dopplerProcessing.kpts_utils import to_physical_list, detransform_list, diff2real, compute_splines
 from dopplerProcessing.stat_utils import stats_report_doppler, compute_kpts_err, stats_report_point_doppler, create_bland_altman, create_point_annotations_excel, compute_stats_original_points, count_inversions
 from utils.utils_stat import match_two_kpts_set
 
@@ -172,7 +172,8 @@ class DopplerEvaluator(DatasetEvaluator):
             #keep normalized data
             dist_pred_gt_kpts.append(100 * match_two_kpts_set(prediction["keypoints"].reshape(num_kpts , 2),
                                                               prediction["keypoints_prediction"].reshape(num_kpts, 2)))
-
+            # gt_kpts = diff2real(gt_kpts)
+            # pred_kpts = diff2real(pred_kpts)
             all_gt_kpts.append(gt_kpts)
             all_pred_kpts.append(pred_kpts)
  
@@ -214,7 +215,7 @@ class DopplerEvaluator(DatasetEvaluator):
             labels = self._dataset.get_labels().tolist()
 
             df = stats_report_doppler(all_pred_kpts,all_gt_kpts, all_phys_pred_kpts, all_phys_gt_kpts, all_gt_splines, all_pred_splines,labels)
-            create_bland_altman(all_phys_pred_kpts, all_phys_gt_kpts,labels, self._output_dir)
+            create_bland_altman(all_phys_pred_kpts, all_phys_gt_kpts, all_gt_splines, all_pred_splines, labels, self._output_dir)
 
             file_path = os.path.join(self._output_dir, "stats_report.csv")
             df.to_csv(file_path, sep=";", decimal=",")
@@ -243,6 +244,9 @@ class DopplerEvaluator(DatasetEvaluator):
         img = cv2.resize(img, dsize=(300, 300), interpolation=cv2.INTER_AREA)
         keypoints_prediction = self._dataset.denormalize_pose(keypoints_prediction, img)
         keypoints = self._dataset.denormalize_pose(keypoints, img)
+
+        # keypoints = diff2real(keypoints)
+        # keypoints_prediction = diff2real(keypoints_prediction)
 
         plot_kpts_pred_and_gt(fig, img, gt_kpts=keypoints, pred_kpts=keypoints_prediction,
                               kpts_info=self._dataset.get_labels(), img_path = data["img_path"],

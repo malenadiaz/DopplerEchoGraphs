@@ -49,10 +49,10 @@ def get_ejection_time(pred_kpts, gt_kpts, labels):
     gt_eje_time = np.apply_along_axis(ejection_time, 1,gt_kpts[:,:,0], beg_index, end_index)
     return  pred_eje_time, gt_eje_time
 
-def get_vit(pred_splines, gt_splines):
-    pred_vit = [auc(spline[:,0], spline[:,1]) for spline in pred_splines]
-    gt_vit = [auc(spline[:,0], spline[:,1]) for spline in gt_splines]
-    return pred_vit, gt_vit
+def get_vti(pred_splines, gt_splines):
+    pred_vti = np.array([auc(spline[:,0], spline[:,1]) for spline in pred_splines])
+    gt_vti = np.array([auc(spline[:,0], spline[:,1]) for spline in gt_splines])
+    return pred_vti, gt_vti
 
 def get_ejection_time_point(pred_kpts, gt_kpts, labels, err_metric):
     beg_index = next((index for index, label in enumerate(labels) if label  == 'ejection beginning'), -1)
@@ -202,12 +202,16 @@ def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, gt_sp
                             ,"PHYS RMSE", "PHYS RMSE X","PHYS RMSE Y" 
                             ,"PUL IDX MAPE", "PUL IDX RMSE"
                             ,"EJE TIME MAPE", "EJE TIME RMSE"
-                            ,"VIT MAPE", "VIT RMSE"])
+                            ,"VTI MAPE", "VTI RMSE"
+                            ,"MAX VEL MAPE", "MAX VEL RMSE"])
 
     pf = rmse_report(pred_kpts, gt_kpts, pf, type ='PIX')
 
     pf = rmse_report(phys_pred_kpts, phys_gt_kpts, pf, type ='PHYS')
 
+    pf.loc[["MAX VEL MAPE"],["TOTAL"]] = mean_absolute_percentage_error(phys_gt_kpts[:,2,1],phys_pred_kpts[:,2,1])
+    pf.loc[["MAX VEL RMSE"],["TOTAL"]] = mean_squared_error(phys_gt_kpts[:,2,1],phys_pred_kpts[:,2,1], squared=False )
+     
     pred_pul_idx, gt_pul_idx = get_pulsatily_idx(pred_splines, gt_splines)
     pf.loc[["PUL IDX MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_pul_idx,pred_pul_idx)
     pf.loc[["PUL IDX RMSE"],["TOTAL"]] = mean_squared_error(gt_pul_idx,pred_pul_idx, squared=False )
@@ -216,9 +220,9 @@ def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, gt_sp
     pf.loc[["EJE TIME MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_eje_time, pred_eje_time)
     pf.loc[["EJE TIME RMSE"],["TOTAL"]] = mean_squared_error(gt_eje_time, pred_eje_time, squared=False)
     
-    pred_vit, gt_vit = get_vit(pred_splines, gt_splines)
-    pf.loc[["VIT MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_vit, pred_vit)
-    pf.loc[["VIT RMSE"],["TOTAL"]] = mean_squared_error(gt_vit, pred_vit, squared=False)
+    pred_vti, gt_vti = get_vti(pred_splines, gt_splines)
+    pf.loc[["VTI MAPE"],["TOTAL"]] = mean_absolute_percentage_error(gt_vti, pred_vti)
+    pf.loc[["VTI RMSE"],["TOTAL"]] = mean_squared_error(gt_vti, pred_vti, squared=False)
     
     pf = pf.astype(float)
 
@@ -227,29 +231,36 @@ def stats_report_doppler(pred_kpts, gt_kpts, phys_pred_kpts, phys_gt_kpts, gt_sp
 
     return pf
 
-def create_bland_altman(phys_pred_kpts, phys_gt_kpts, labels, output_dir):
+def create_bland_altman(phys_pred_kpts, phys_gt_kpts,  gt_splines, pred_splines, labels, output_dir):
     with mpl.rc_context({'font.size': 25}):  
         #maximum velocity bland altman 
         plt.clf()
         ax = plt.gca()
         pred_max_vel, gt_max_vel = get_maximum_velocity(phys_pred_kpts, phys_gt_kpts)
-        sm.graphics.mean_diff_plot(gt_max_vel, pred_max_vel, ax = ax, font_size = 22)
+        sm.graphics.mean_diff_plot(gt_max_vel, pred_max_vel, ax = ax, font_size = 30)
         ax.set_title("Maximum Velocity")
         plt.savefig(os.path.join(output_dir,'max_vel_BA.png'))
 
         plt.clf()
         ax = plt.gca()
-        pred_pul_idx, gt_pul_idx = get_pulsatily_idx(phys_pred_kpts, phys_gt_kpts)
-        sm.graphics.mean_diff_plot(gt_pul_idx, pred_pul_idx, ax = ax, font_size = 22)
+        pred_pul_idx, gt_pul_idx = get_pulsatily_idx(pred_splines, gt_splines)
+        sm.graphics.mean_diff_plot(gt_pul_idx, pred_pul_idx, ax = ax, font_size = 30)
         ax.set_title("Pulsatility Index")
         plt.savefig(os.path.join(output_dir,'pul_idx_BA.png'))
 
         plt.clf()
         ax = plt.gca()
         pred_eje_time, gt_eje_time = get_ejection_time(phys_pred_kpts, phys_gt_kpts,labels)
-        sm.graphics.mean_diff_plot(gt_eje_time, pred_eje_time, ax = ax, font_size = 22)
+        sm.graphics.mean_diff_plot(gt_eje_time, pred_eje_time, ax = ax, font_size = 30)
         ax.set_title("Ejection time")
         plt.savefig(os.path.join(output_dir,'eje_time_BA.png'))
+
+        plt.clf()
+        ax = plt.gca()
+        pred_vti, gt_vti = get_vti(pred_splines, gt_splines)
+        sm.graphics.mean_diff_plot(gt_vti, pred_vti, ax = ax, font_size = 30)
+        ax.set_title("Velocity time integral")
+        plt.savefig(os.path.join(output_dir,'VTI_BA.png'))
 
 def count_inversions(predKpts, img_paths, output_dir):
     inversions = 0

@@ -12,7 +12,7 @@ from engine.loops import sample_dataset, train_vanilla, validate
 from engine.checkpoints import save_model
 from evaluation.EchonetEvaluator import EchonetEvaluator
 from evaluation.DopplerEvaluator import DopplerEvaluator
-from models import load_model
+from models import load_model, load_freezed_encoder
 from losses import load_loss
 from datasets import load_dataset
 from transforms import load_transform
@@ -71,6 +71,10 @@ def train(cfg):
 
     # ----- Load model -----:
     model = load_model(cfg,is_gpu=is_gpu) # notice the default num of keypooints
+    
+    if cfg.TRAIN.CHECKPOINT_FILE_PATH is not None:
+        model = load_freezed_encoder(cfg.TRAIN.CHECKPOINT_FILE_PATH, cfg, model)
+
     model.to(device)
     print('training model {}..'.format(model.__class__.__name__))
     # if resume training:
